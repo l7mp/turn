@@ -14,6 +14,7 @@ type ManagerConfig struct {
 	LeveledLogger      logging.LeveledLogger
 	AllocatePacketConn func(network string, requestedPort int) (net.PacketConn, net.Addr, error)
 	AllocateConn       func(network string, requestedPort int) (net.Conn, net.Addr, error)
+        PermissionHandler  func(peerAddress net.IP, peerPort int) bool
 }
 
 type reservation struct {
@@ -31,6 +32,7 @@ type Manager struct {
 
 	allocatePacketConn func(network string, requestedPort int) (net.PacketConn, net.Addr, error)
 	allocateConn       func(network string, requestedPort int) (net.Conn, net.Addr, error)
+        permissionHandler  func(peerAddress net.IP, peerPort int) (ok bool)
 }
 
 // NewManager creates a new instance of Manager.
@@ -42,6 +44,8 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		return nil, errAllocateConnMustBeSet
 	case config.LeveledLogger == nil:
 		return nil, errLeveledLoggerMustBeSet
+	case config.PermissionHandler == nil:
+		return nil, errPermissionHandlerMustBeSet
 	}
 
 	return &Manager{
@@ -49,6 +53,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		allocations:        make(map[string]*Allocation, 64),
 		allocatePacketConn: config.AllocatePacketConn,
 		allocateConn:       config.AllocateConn,
+                permissionHandler:  config.PermissionHandler,
 	}, nil
 }
 
@@ -194,4 +199,13 @@ func (m *Manager) GetRandomEvenPort() (int, error) {
 		}
 	}
 	return 0, errFailedToAllocateEvenPort
+}
+
+// GrantPermission handles permission requests
+func (m *Manager) GrantPermission(peerAddress net.IP, peerPort int) error {
+        if m.permissionHandler(peerAddress, peerPort) {
+                return nil
+        }
+
+        return errAdminProhibited
 }

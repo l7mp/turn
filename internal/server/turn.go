@@ -231,8 +231,15 @@ func handleCreatePermissionRequest(r Request, m *stun.Message) error {
 			return err
 		}
 
+                if err := r.AllocationManager.GrantPermission(peerAddress.IP, peerAddress.Port); err != nil {
+                        r.Log.Infof("permission denied for peer %s", fmt.Sprintf("%s:%d",
+                                peerAddress.IP.String(), peerAddress.Port))
+                        return err
+                }
+
 		r.Log.Debugf("adding permission for %s", fmt.Sprintf("%s:%d",
 			peerAddress.IP.String(), peerAddress.Port))
+
 		a.AddPermission(allocation.NewPermission(
 			&net.UDPAddr{
 				IP:   peerAddress.IP,
@@ -315,6 +322,12 @@ func handleChannelBindRequest(r Request, m *stun.Message) error {
 	if err = peerAddr.GetFrom(m); err != nil {
 		return buildAndSendErr(r.Conn, r.SrcAddr, err, badRequestMsg...)
 	}
+
+        if err := r.AllocationManager.GrantPermission(peerAddr.IP, peerAddr.Port); err != nil {
+                r.Log.Infof("permission denied for peer %s", fmt.Sprintf("%s:%d",
+                        peerAddr.IP.String(), peerAddr.Port))
+                return err
+        }
 
 	r.Log.Debugf("binding channel %d to %s",
 		channel,

@@ -6,6 +6,7 @@ var (
 	errAllocatePacketConnMustBeSet = errors.New("AllocatePacketConn must be set")
 	errAllocateConnMustBeSet       = errors.New("AllocateConn must be set")
 	errLeveledLoggerMustBeSet      = errors.New("LeveledLogger must be set")
+        errPermissionHandlerMustBeSet  = errors.New("PermissionHandler must be set")
 	errSameChannelDifferentPeer    = errors.New("you cannot use the same channel number with different peer")
 	errNilFiveTuple                = errors.New("allocations must not be created with nil FivTuple")
 	errNilFiveTupleSrcAddr         = errors.New("allocations must not be created with nil FiveTuple.SrcAddr")
@@ -15,4 +16,5 @@ var (
 	errDupeFiveTuple               = errors.New("allocation attempt created with duplicate FiveTuple")
 	errFailedToCastUDPAddr         = errors.New("failed to cast net.Addr to *net.UDPAddr")
 	errFailedToAllocateEvenPort    = errors.New("failed to allocate an even port")
+	errAdminProhibited             = errors.New("permission request administratively prohibited")
 )

@@ -23,6 +23,14 @@ type RelayAddressGenerator interface {
 	AllocateConn(network string, requestedPort int) (net.Conn, net.Addr, error)
 }
 
+// PermissionHandler is a callback to filter incoming ChannelBindRequest and CreatePermission requests in order to allow users to customize Pion TURN with custom behavior
+type PermissionHandler func(peerAddress net.IP, peerPort int) (ok bool)
+
+// DefaultPermissionHandler is convince function that admits permission requests to all peers
+func DefaultPermissionHandler(peerAddress net.IP, peerPort int) (ok bool){
+        return true
+}
+
 // PacketConnConfig is a single net.PacketConn to listen/write on. This will be used for UDP listeners
 type PacketConnConfig struct {
 	PacketConn net.PacketConn
@@ -30,6 +38,9 @@ type PacketConnConfig struct {
 	// When an allocation is generated the RelayAddressGenerator
 	// creates the net.PacketConn and returns the IP/Port it is available at
 	RelayAddressGenerator RelayAddressGenerator
+
+        // PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which case the DefaultPermissionHandler is automatically instantiated which admits all peers connections
+        PermissionHandler PermissionHandler
 }
 
 func (c *PacketConnConfig) validate() error {
@@ -50,6 +61,9 @@ type ListenerConfig struct {
 	// When an allocation is generated the RelayAddressGenerator
 	// creates the net.PacketConn and returns the IP/Port it is available at
 	RelayAddressGenerator RelayAddressGenerator
+
+        // PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which case the DefaultPermissionHandler is automatically instantiated which admits all peers connections
+        PermissionHandler PermissionHandler
 }
 
 func (c *ListenerConfig) validate() error {

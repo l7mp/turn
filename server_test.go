@@ -114,6 +114,81 @@ func TestServer(t *testing.T) {
 		assert.Equal(t, server.inboundMTU, 2000)
 		assert.NoError(t, server.Close())
 	})
+	t.Run("permissionHandler", func(t *testing.T) {
+		udpListener, err := net.ListenPacket("udp4", "0.0.0.0:3478")
+		assert.NoError(t, err)
+
+		server, err := NewServer(ServerConfig{
+			AuthHandler: func(username, realm string, srcAddr net.Addr) (key []byte, ok bool) {
+				if pw, ok := credMap[username]; ok {
+					return pw, true
+				}
+				return nil, false
+			},
+			PacketConnConfigs: []PacketConnConfig{
+				{
+					PacketConn: udpListener,
+					RelayAddressGenerator: &RelayAddressGeneratorStatic{
+						RelayAddress: net.ParseIP("127.0.0.1"),
+						Address:      "0.0.0.0",
+					},
+                                        PermissionHandler: func(addr net.IP, port int) bool {
+                                                return addr.Equal(net.ParseIP("1.2.3.4")) && port == 12345
+                                        },
+				},
+			},
+			Realm:         "pion.ly",
+			LoggerFactory: loggerFactory,
+		})
+		assert.NoError(t, err)
+
+		conn, err := net.ListenPacket("udp4", "0.0.0.0:0")
+		assert.NoError(t, err)
+
+		client, err := NewClient(&ClientConfig{
+                        STUNServerAddr: "127.0.0.1:3478",
+                        TURNServerAddr: "127.0.0.1:3478",
+			Conn:           conn,
+                        Username:       "user",
+                        Password:       "pass",
+                        Realm:          "pion.ly",
+			LoggerFactory:  loggerFactory,
+		})
+		assert.NoError(t, err)
+		assert.NoError(t, client.Listen())
+
+                relayConn, err := client.Allocate()
+		assert.NoError(t, err)
+
+                whiteAddr, errA := net.ResolveUDPAddr("udp", "1.2.3.4:12345")
+		assert.NoError(t, errA, "should succeed")
+                err = client.CreatePermission(whiteAddr)
+		assert.NoError(t, err, "grant permission for whitelisted peer")
+
+                blackAddr1, errB1 := net.ResolveUDPAddr("udp", "1.2.3.5:12345")
+		assert.NoError(t, errB1, "should succeed")
+                err = client.CreatePermission(blackAddr1)
+		assert.ErrorContains(t, err, "error", "deny permission for blacklisted peer address")
+
+                blackAddr2, errB2 := net.ResolveUDPAddr("udp", "1.2.3.4:12346")
+		assert.NoError(t, errB2, "should succeed")
+                err = client.CreatePermission(blackAddr2)
+		assert.ErrorContains(t, err, "error", "deny permission for blacklisted peer port")
+
+                err = client.CreatePermission(whiteAddr, whiteAddr)
+		assert.NoError(t, err, "grant permission for repeated whitelisted peer addresses")
+
+                // rg0now: isn't this a cornercase in the spec?
+                err = client.CreatePermission(whiteAddr, blackAddr1)
+		assert.ErrorContains(t, err, "error", "deny permission for mixed whitelisted and blacklisted peers")
+
+		assert.NoError(t, relayConn.Close())
+
+                client.Close()
+		assert.NoError(t, conn.Close())
+
+		assert.NoError(t, server.Close())
+	})
 }
 
 type VNet struct {

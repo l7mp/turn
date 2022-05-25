@@ -66,9 +66,15 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 	for i := range s.packetConnConfigs {
 		go func(i int, p PacketConnConfig) {
+                        var permissionHandler PermissionHandler = p.PermissionHandler
+                        if permissionHandler == nil {
+                                permissionHandler = DefaultPermissionHandler
+                        }
+
 			allocationManager, err := allocation.NewManager(allocation.ManagerConfig{
 				AllocatePacketConn: p.RelayAddressGenerator.AllocatePacketConn,
 				AllocateConn:       p.RelayAddressGenerator.AllocateConn,
+                                PermissionHandler:  permissionHandler,
 				LeveledLogger:      s.log,
 			})
 			if err != nil {
@@ -88,9 +94,15 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 	for i, listener := range s.listenerConfigs {
 		go func(i int, l ListenerConfig) {
+                        var permissionHandler PermissionHandler = l.PermissionHandler
+                        if permissionHandler == nil {
+                                permissionHandler = DefaultPermissionHandler
+                        }
+
 			allocationManager, err := allocation.NewManager(allocation.ManagerConfig{
 				AllocatePacketConn: l.RelayAddressGenerator.AllocatePacketConn,
 				AllocateConn:       l.RelayAddressGenerator.AllocateConn,
+                                PermissionHandler:  permissionHandler,
 				LeveledLogger:      s.log,
 			})
 			if err != nil {
