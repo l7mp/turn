@@ -23,11 +23,17 @@ type RelayAddressGenerator interface {
 	AllocateConn(network string, requestedPort int) (net.Conn, net.Addr, error)
 }
 
-// PermissionHandler is a callback to filter incoming ChannelBindRequest and CreatePermission requests in order to allow users to customize Pion TURN with custom behavior
-type PermissionHandler func(peerAddress net.IP, peerPort int) (ok bool)
+// PermissionHandler is a callback to filter incoming ChannelBindRequest and CreatePermission
+// requests in order to allow users to customize the Pion TURN server with custom behavior. Based
+// on the client IP address and port and the peer IP address the client intends to connect to, the
+// callback can decide whether to admit the request and return true, or reject it and return
+// false. Note that TURN permissions ar per-peer-IP-address, to mimic the address-restricted
+// filtering mechanism of NATs that comply with [RFC4787].
+// https://tools.ietf.org/html/rfc5766#section-2.3
+type PermissionHandler func(clientAddr net.Addr, peerIP net.IP) (ok bool)
 
 // DefaultPermissionHandler is convince function that admits permission requests to all peers
-func DefaultPermissionHandler(peerAddress net.IP, peerPort int) (ok bool){
+func DefaultPermissionHandler(clientAddr net.Addr, peerIP net.IP) (ok bool) {
         return true
 }
 
@@ -39,7 +45,9 @@ type PacketConnConfig struct {
 	// creates the net.PacketConn and returns the IP/Port it is available at
 	RelayAddressGenerator RelayAddressGenerator
 
-        // PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which case the DefaultPermissionHandler is automatically instantiated which admits all peers connections
+        // PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which
+        // case the DefaultPermissionHandler is automatically instantiated to admit all peer
+        // connections
         PermissionHandler PermissionHandler
 }
 
@@ -62,7 +70,9 @@ type ListenerConfig struct {
 	// creates the net.PacketConn and returns the IP/Port it is available at
 	RelayAddressGenerator RelayAddressGenerator
 
-        // PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which case the DefaultPermissionHandler is automatically instantiated which admits all peers connections
+        // PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which
+        // case the DefaultPermissionHandler is automatically instantiated to admit all peer
+        // connections
         PermissionHandler PermissionHandler
 }
 
