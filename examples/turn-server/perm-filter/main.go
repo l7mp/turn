@@ -1,9 +1,15 @@
+// This example demonstrates the use of a permission handler in the PION TURN server. The
+// permission handler implements a filtering policy that lets clients to connect back to their own
+// host or server-reflexive address but will filter out everything else. This will let the client
+// ping-test through but will block essentially all other peer connection attempts.
+
 package main
 
 import (
 	"flag"
 	"log"
 	"net"
+        "strings"
 	"os"
 	"os/signal"
 	"regexp"
@@ -60,6 +66,19 @@ func main() {
 					RelayAddress: net.ParseIP(*publicIP), // Claim that we are listening on IP passed by user (This should be your Public IP)
 					Address:      "0.0.0.0",              // But actually be listening on every interface
 				},
+                                // allow peer connections only to the client's own (host or server-reflexive) IP
+                                PermissionHandler: func(clientAddr net.Addr, peerIP net.IP) bool {
+                                        clientIP := strings.SplitN(clientAddr.String(), ":", 2)
+                                        if clientIP[0] != peerIP.String() {
+                                                log.Printf("Blocking request from client IP %s to peer %s",
+                                                        clientIP[0], peerIP.String())
+                                                return false
+                                        }
+
+                                        log.Printf("Admitting request from client IP %s to peer %s",
+                                                clientIP[0], peerIP.String())
+                                        return true
+                                },
 			},
 		},
 	})
