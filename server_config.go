@@ -24,12 +24,11 @@ type RelayAddressGenerator interface {
 }
 
 // PermissionHandler is a callback to filter incoming ChannelBindRequest and CreatePermission
-// requests in order to allow users to customize the Pion TURN server with custom behavior. Based
-// on the client IP address and port and the peer IP address the client intends to connect to, the
-// callback can decide whether to admit the request and return true, or reject it and return
-// false. Note that TURN permissions ar per-peer-IP-address, to mimic the address-restricted
-// filtering mechanism of NATs that comply with [RFC4787].
-// https://tools.ietf.org/html/rfc5766#section-2.3
+// requests based on the client IP address and port and the peer IP address the client intends to
+// connect to. If the client is behind a NAT then the filter acts on the server reflexive
+// ("mapped") address instead of the real client IP and port. Note that TURN permissions ar
+// per-allocation and per-peer-IP-address, to mimic the address-restricted filtering mechanism of
+// NATs that comply with [RFC4787].  https://tools.ietf.org/html/rfc5766#section-2.3
 type PermissionHandler func(clientAddr net.Addr, peerIP net.IP) (ok bool)
 
 // DefaultPermissionHandler is convince function that admits permission requests to all peers
