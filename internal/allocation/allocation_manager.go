@@ -44,8 +44,6 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		return nil, errAllocateConnMustBeSet
 	case config.LeveledLogger == nil:
 		return nil, errLeveledLoggerMustBeSet
-	case config.PermissionHandler == nil:
-		return nil, errPermissionHandlerMustBeSet
 	}
 
 	return &Manager{
@@ -204,6 +202,11 @@ func (m *Manager) GetRandomEvenPort() (int, error) {
 // GrantPermission handles permission requests by calling the permission handler callback
 // associated with the TURN server listener socket
 func (m *Manager) GrantPermission(sourceAddr net.Addr, peerIP net.IP) error {
+        // no permission handler: open
+        if m.permissionHandler == nil {
+                return nil
+        }
+        
         if m.permissionHandler(sourceAddr, peerIP) {
                 return nil
         }
