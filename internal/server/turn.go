@@ -76,7 +76,7 @@ func handleAllocateRequest(r Request, m *stun.Message) error {
 	// 5.  The server checks if the request contains a RESERVATION-TOKEN
 	//     attribute.  If yes, and the request also contains an EVEN-PORT
 	//     attribute, then the server rejects the request with a 400 (Bad
-	//     Request) error.  Otherwise, it checks to see if the token is
+	//     Request) error.	Otherwise, it checks to see if the token is
 	//     valid (i.e., the token is in range and has not expired and the
 	//     corresponding relayed transport address is still available).  If
 	//     the token is not valid for some reason, the server rejects the
@@ -231,11 +231,11 @@ func handleCreatePermissionRequest(r Request, m *stun.Message) error {
 			return err
 		}
 
-                if err := r.AllocationManager.GrantPermission(r.SrcAddr, peerAddress.IP); err != nil {
-                        r.Log.Infof("permission denied for client %s to peer %s", r.SrcAddr.String(),
-                                peerAddress.IP.String())
-                        return err
-                }
+		if err := r.AllocationManager.GrantPermission(r.SrcAddr, peerAddress.IP); err != nil {
+			r.Log.Infof("permission denied for client %s to peer %s", r.SrcAddr.String(),
+				peerAddress.IP.String())
+			return err
+		}
 
 		r.Log.Debugf("adding permission for %s", fmt.Sprintf("%s:%d",
 			peerAddress.IP.String(), peerAddress.Port))
@@ -324,14 +324,14 @@ func handleChannelBindRequest(r Request, m *stun.Message) error {
 	}
 
 	if err := r.AllocationManager.GrantPermission(r.SrcAddr, peerAddr.IP); err != nil {
-                r.Log.Infof("permission denied for client %s to peer %s", r.SrcAddr.String(),
-                        peerAddr.IP.String())
-                
-                unauthorizedRequestMsg := buildMsg(m.TransactionID,
-                        stun.NewType(stun.MethodChannelBind, stun.ClassErrorResponse),
-                        &stun.ErrorCodeAttribute{Code: stun.CodeUnauthorized})
+		r.Log.Infof("permission denied for client %s to peer %s", r.SrcAddr.String(),
+			peerAddr.IP.String())
+		
+		unauthorizedRequestMsg := buildMsg(m.TransactionID,
+			stun.NewType(stun.MethodChannelBind, stun.ClassErrorResponse),
+			&stun.ErrorCodeAttribute{Code: stun.CodeUnauthorized})
 		return buildAndSendErr(r.Conn, r.SrcAddr, err, unauthorizedRequestMsg...)
-        }
+	}
 
 	r.Log.Debugf("binding channel %d to %s",
 		channel,

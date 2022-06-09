@@ -11,9 +11,9 @@ import (
 
 // ManagerConfig a bag of config params for Manager.
 type ManagerConfig struct {
-	LeveledLogger      logging.LeveledLogger
+	LeveledLogger	   logging.LeveledLogger
 	AllocatePacketConn func(network string, requestedPort int) (net.PacketConn, net.Addr, error)
-	AllocateConn       func(network string, requestedPort int) (net.Conn, net.Addr, error)
+	AllocateConn	   func(network string, requestedPort int) (net.Conn, net.Addr, error)
 	PermissionHandler  func(sourceAddr net.Addr, peerIP net.IP) bool
 }
 
