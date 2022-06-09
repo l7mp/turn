@@ -31,9 +31,9 @@ type RelayAddressGenerator interface {
 // NATs that comply with [RFC4787].  https://tools.ietf.org/html/rfc5766#section-2.3
 type PermissionHandler func(clientAddr net.Addr, peerIP net.IP) (ok bool)
 
-// DefaultPermissionHandler is convince function that admits permission requests to all peers
+// DefaultPermissionHandler is convince function that grants permission to all peers
 func DefaultPermissionHandler(clientAddr net.Addr, peerIP net.IP) (ok bool) {
-        return true
+	return true
 }
 
 // PacketConnConfig is a single net.PacketConn to listen/write on. This will be used for UDP listeners
@@ -44,10 +44,10 @@ type PacketConnConfig struct {
 	// creates the net.PacketConn and returns the IP/Port it is available at
 	RelayAddressGenerator RelayAddressGenerator
 
-        // PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which
-        // case the DefaultPermissionHandler is automatically instantiated to admit all peer
-        // connections
-        PermissionHandler PermissionHandler
+	// PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which
+	// case the DefaultPermissionHandler is automatically instantiated to admit all peer
+	// connections
+	PermissionHandler PermissionHandler
 }
 
 func (c *PacketConnConfig) validate() error {
@@ -69,10 +69,10 @@ type ListenerConfig struct {
 	// creates the net.PacketConn and returns the IP/Port it is available at
 	RelayAddressGenerator RelayAddressGenerator
 
-        // PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which
-        // case the DefaultPermissionHandler is automatically instantiated to admit all peer
-        // connections
-        PermissionHandler PermissionHandler
+	// PermissionHandler is a callback to filter peer addresses. Can be set as nil, in which
+	// case the DefaultPermissionHandler is automatically instantiated to admit all peer
+	// connections
+	PermissionHandler PermissionHandler
 }
 
 func (c *ListenerConfig) validate() error {
@@ -103,7 +103,7 @@ type ServerConfig struct {
 	// PacketConnConfigs and ListenerConfigs are a list of all the turn listeners
 	// Each listener can have custom behavior around the creation of Relays
 	PacketConnConfigs []PacketConnConfig
-	ListenerConfigs   []ListenerConfig
+	ListenerConfigs	  []ListenerConfig
 
 	// LoggerFactory must be set for logging from this server.
 	LoggerFactory logging.LoggerFactory

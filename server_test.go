@@ -23,7 +23,7 @@ func TestServer(t *testing.T) {
 	defer report()
 
 	loggerFactory := logging.NewDefaultLoggerFactory()
-        // loggerFactory.DefaultLogLevel = logging.LogLevelTrace
+	// loggerFactory.DefaultLogLevel = logging.LogLevelTrace
 
 	credMap := map[string][]byte{
 		"user": GenerateAuthKey("user", "pion.ly", "pass"),
@@ -49,7 +49,7 @@ func TestServer(t *testing.T) {
 					},
 				},
 			},
-			Realm:         "pion.ly",
+			Realm:	       "pion.ly",
 			LoggerFactory: loggerFactory,
 		})
 		assert.NoError(t, err)
@@ -60,7 +60,7 @@ func TestServer(t *testing.T) {
 		assert.NoError(t, err)
 
 		client, err := NewClient(&ClientConfig{
-			Conn:          conn,
+			Conn:	       conn,
 			LoggerFactory: loggerFactory,
 		})
 		assert.NoError(t, err)
@@ -133,134 +133,134 @@ func TestServer(t *testing.T) {
 						RelayAddress: net.ParseIP("127.0.0.1"),
 						Address:      "0.0.0.0",
 					},
-                                        PermissionHandler: func(src net.Addr, peer net.IP) bool {
-                                                return src.String() == "127.0.0.33:54321" &&
-                                                        peer.Equal(net.ParseIP("127.0.0.4"))
-                                        },
+					PermissionHandler: func(src net.Addr, peer net.IP) bool {
+						return src.String() == "127.0.0.33:54321" &&
+							peer.Equal(net.ParseIP("127.0.0.4"))
+					},
 				},
 			},
-			Realm:         "pion.ly",
+			Realm:	       "pion.ly",
 			LoggerFactory: loggerFactory,
 		})
 		assert.NoError(t, err)
 
-                // enforce corrent client IP and port
+		// enforce corrent client IP and port
 		conn, err := net.ListenPacket("udp4", "127.0.0.33:54321")
 		assert.NoError(t, err)
 
 		client, err := NewClient(&ClientConfig{
-                        STUNServerAddr: "127.0.0.1:3478",
-                        TURNServerAddr: "127.0.0.1:3478",
-			Conn:           conn,
-                        Username:       "user",
-                        Password:       "pass",
-                        Realm:          "pion.ly",
-			LoggerFactory:  loggerFactory,
+			STUNServerAddr: "127.0.0.1:3478",
+			TURNServerAddr: "127.0.0.1:3478",
+			Conn:		conn,
+			Username:	"user",
+			Password:	"pass",
+			Realm:		"pion.ly",
+			LoggerFactory:	loggerFactory,
 		})
 		assert.NoError(t, err)
 		assert.NoError(t, client.Listen())
 
-                relayConn, err := client.Allocate()
+		relayConn, err := client.Allocate()
 		assert.NoError(t, err)
 
-                whiteAddr, errA := net.ResolveUDPAddr("udp", "127.0.0.4:12345")
+		whiteAddr, errA := net.ResolveUDPAddr("udp", "127.0.0.4:12345")
 		assert.NoError(t, errA, "should succeed")
-                blackAddr, errB1 := net.ResolveUDPAddr("udp", "127.0.0.5:12345")
+		blackAddr, errB1 := net.ResolveUDPAddr("udp", "127.0.0.5:12345")
 		assert.NoError(t, errB1, "should succeed")
 
-                // explicit CreatePermission
-                err = client.CreatePermission(whiteAddr)
+		// explicit CreatePermission
+		err = client.CreatePermission(whiteAddr)
 		assert.NoError(t, err, "grant permission for whitelisted peer")
 
-                err = client.CreatePermission(blackAddr)
+		err = client.CreatePermission(blackAddr)
 		assert.ErrorContains(t, err, "error", "deny permission for blacklisted peer address")
 
-                err = client.CreatePermission(whiteAddr, whiteAddr)
+		err = client.CreatePermission(whiteAddr, whiteAddr)
 		assert.NoError(t, err, "grant permission for repeated whitelisted peer addresses")
 
-                err = client.CreatePermission(blackAddr)
+		err = client.CreatePermission(blackAddr)
 		assert.ErrorContains(t, err, "error", "deny permission for repeated blacklisted peer address")
 
-                // rg0now: isn't this a cornercase in the spec?
-                err = client.CreatePermission(whiteAddr, blackAddr)
+		// rg0now: isn't this a cornercase in the spec?
+		err = client.CreatePermission(whiteAddr, blackAddr)
 		assert.ErrorContains(t, err, "error", "deny permission for mixed whitelisted and blacklisted peers")
 
-                // implicit CreatePermission for ChannelBindRequests: WriteTo always tries to bind a channel
-                _, err = relayConn.WriteTo([]byte("Hello"), whiteAddr)
+		// implicit CreatePermission for ChannelBindRequests: WriteTo always tries to bind a channel
+		_, err = relayConn.WriteTo([]byte("Hello"), whiteAddr)
 		assert.NoError(t, err, "write to whitelisted peer address succeeds - 1")
 
-                _, err = relayConn.WriteTo([]byte("Hello"), blackAddr)
+		_, err = relayConn.WriteTo([]byte("Hello"), blackAddr)
 		assert.ErrorContains(t, err, "error", "write to blacklisted peer address fails - 1")
 
-                _, err = relayConn.WriteTo([]byte("Hello"), whiteAddr)
+		_, err = relayConn.WriteTo([]byte("Hello"), whiteAddr)
 		assert.NoError(t, err, "write to whitelisted peer address succeeds - 2")
 
-                _, err = relayConn.WriteTo([]byte("Hello"), blackAddr)
+		_, err = relayConn.WriteTo([]byte("Hello"), blackAddr)
 		assert.ErrorContains(t, err, "error", "write to blacklisted peer address fails - 2")
 
-                _, err = relayConn.WriteTo([]byte("Hello"), whiteAddr)
+		_, err = relayConn.WriteTo([]byte("Hello"), whiteAddr)
 		assert.NoError(t, err, "write to whitelisted peer address succeeds - 3")
 
-                _, err = relayConn.WriteTo([]byte("Hello"), blackAddr)
+		_, err = relayConn.WriteTo([]byte("Hello"), blackAddr)
 		assert.ErrorContains(t, err, "error", "write to blacklisted peer address fails - 3")
 
-                // let the previous transaction terminate
-                time.Sleep(200 * time.Millisecond)
+		// let the previous transaction terminate
+		time.Sleep(200 * time.Millisecond)
 		assert.NoError(t, relayConn.Close())
 
-                client.Close()
+		client.Close()
 		assert.NoError(t, conn.Close())
 
-                // enforce filtered source address
+		// enforce filtered source address
 		conn2, err := net.ListenPacket("udp4", "127.0.0.133:54321")
 		assert.NoError(t, err)
 
 		client2, err := NewClient(&ClientConfig{
-                        STUNServerAddr: "127.0.0.1:3478",
-                        TURNServerAddr: "127.0.0.1:3478",
-			Conn:           conn2,
-                        Username:       "user",
-                        Password:       "pass",
-                        Realm:          "pion.ly",
-			LoggerFactory:  loggerFactory,
+			STUNServerAddr: "127.0.0.1:3478",
+			TURNServerAddr: "127.0.0.1:3478",
+			Conn:		conn2,
+			Username:	"user",
+			Password:	"pass",
+			Realm:		"pion.ly",
+			LoggerFactory:	loggerFactory,
 		})
 		assert.NoError(t, err)
 		assert.NoError(t, client2.Listen())
 
-                relayConn2, err := client2.Allocate()
+		relayConn2, err := client2.Allocate()
 		assert.NoError(t, err)
 
-                // explicit CreatePermission
-                err = client2.CreatePermission(whiteAddr)
+		// explicit CreatePermission
+		err = client2.CreatePermission(whiteAddr)
 		assert.ErrorContains(t, err, "error", "deny permission from filtered source to whitelisted peer")
 
-                err = client2.CreatePermission(blackAddr)
+		err = client2.CreatePermission(blackAddr)
 		assert.ErrorContains(t, err, "error", "deny permission from filtered source to blacklisted peer")
 
-                // implicit CreatePermission for ChannelBindRequests: WriteTo always tries to bind a channel
-                _, err = relayConn2.WriteTo([]byte("Hello"), whiteAddr)
+		// implicit CreatePermission for ChannelBindRequests: WriteTo always tries to bind a channel
+		_, err = relayConn2.WriteTo([]byte("Hello"), whiteAddr)
 		assert.ErrorContains(t, err, "error", "write from filtered source to whitelisted peer fails - 1")
 
-                _, err = relayConn2.WriteTo([]byte("Hello"), blackAddr)
+		_, err = relayConn2.WriteTo([]byte("Hello"), blackAddr)
 		assert.ErrorContains(t, err, "error", "write from filtered source to blacklisted peer fails - 1")
 
-                _, err = relayConn2.WriteTo([]byte("Hello"), whiteAddr)
+		_, err = relayConn2.WriteTo([]byte("Hello"), whiteAddr)
 		assert.ErrorContains(t, err, "error", "write from filtered source to whitelisted peer fails - 2")
 
-                _, err = relayConn2.WriteTo([]byte("Hello"), blackAddr)
+		_, err = relayConn2.WriteTo([]byte("Hello"), blackAddr)
 		assert.ErrorContains(t, err, "error", "write from filtered source to blacklisted peer fails - 2")
 
-                _, err = relayConn2.WriteTo([]byte("Hello"), whiteAddr)
+		_, err = relayConn2.WriteTo([]byte("Hello"), whiteAddr)
 		assert.ErrorContains(t, err, "error", "write from filtered source to whitelisted peer fails - 3")
 
-                _, err = relayConn2.WriteTo([]byte("Hello"), blackAddr)
+		_, err = relayConn2.WriteTo([]byte("Hello"), blackAddr)
 		assert.ErrorContains(t, err, "error", "write from filtered source to blacklisted peer fails - 3")
 
-                // let the previous transaction terminate
-                time.Sleep(200 * time.Millisecond)
+		// let the previous transaction terminate
+		time.Sleep(200 * time.Millisecond)
 		assert.NoError(t, relayConn2.Close())
 
-                client2.Close()
+		client2.Close()
 		assert.NoError(t, conn2.Close())
 
 		assert.NoError(t, server.Close())
@@ -287,7 +287,7 @@ func buildVNet() (*VNet, error) {
 
 	// WAN
 	wan, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:          "0.0.0.0/0",
+		CIDR:	       "0.0.0.0/0",
 		LoggerFactory: loggerFactory,
 	})
 	if err != nil {
@@ -315,7 +315,7 @@ func buildVNet() (*VNet, error) {
 	// LAN
 	lan, err := vnet.NewRouter(&vnet.RouterConfig{
 		StaticIP: "5.6.7.8", // this router's external IP on eth0
-		CIDR:     "192.168.0.0/24",
+		CIDR:	  "192.168.0.0/24",
 		NATType: &vnet.NATType{
 			MappingBehavior:   vnet.EndpointIndependent,
 			FilteringBehavior: vnet.EndpointIndependent,
@@ -361,7 +361,7 @@ func buildVNet() (*VNet, error) {
 				PacketConn: udpListener,
 				RelayAddressGenerator: &RelayAddressGeneratorNone{
 					Address: "1.2.3.4",
-					Net:     net0,
+					Net:	 net0,
 				},
 			},
 		},
@@ -386,10 +386,10 @@ func buildVNet() (*VNet, error) {
 	}
 
 	return &VNet{
-		wan:    wan,
-		net0:   net0,
-		net1:   net1,
-		netL0:  netL0,
+		wan:	wan,
+		net0:	net0,
+		net1:	net1,
+		netL0:	netL0,
 		server: server,
 	}, nil
 }
@@ -420,9 +420,9 @@ func TestServerVNet(t *testing.T) {
 		log.Debug("creating a client.")
 		client, err := NewClient(&ClientConfig{
 			STUNServerAddr: "1.2.3.4:3478",
-			Conn:           lconn,
-			Net:            v.netL0,
-			LoggerFactory:  loggerFactory,
+			Conn:		lconn,
+			Net:		v.netL0,
+			LoggerFactory:	loggerFactory,
 		})
 		assert.NoError(t, err, "should succeed")
 		assert.NoError(t, client.Listen(), "should succeed")
@@ -451,11 +451,11 @@ func TestServerVNet(t *testing.T) {
 		client, err := NewClient(&ClientConfig{
 			STUNServerAddr: "stun.pion.ly:3478",
 			TURNServerAddr: "turn.pion.ly:3478",
-			Username:       "user",
-			Password:       "pass",
-			Conn:           lconn,
-			Net:            v.netL0,
-			LoggerFactory:  loggerFactory,
+			Username:	"user",
+			Password:	"pass",
+			Conn:		lconn,
+			Net:		v.netL0,
+			LoggerFactory:	loggerFactory,
 		})
 
 		assert.NoError(t, err)
@@ -523,10 +523,10 @@ func TestConsumeSingleTURNFrame(t *testing.T) {
 		err  error
 	}
 	cases := map[string]testCase{
-		"channel data":                          {data: []byte{0x40, 0x01, 0x00, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, err: nil},
+		"channel data":				 {data: []byte{0x40, 0x01, 0x00, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, err: nil},
 		"partial data less than channel header": {data: []byte{1}, err: errIncompleteTURNFrame},
-		"partial stun message":                  {data: []byte{0x0, 0x16, 0x02, 0xDC, 0x21, 0x12, 0xA4, 0x42, 0x0, 0x0, 0x0}, err: errIncompleteTURNFrame},
-		"stun message":                          {data: []byte{0x0, 0x16, 0x00, 0x02, 0x21, 0x12, 0xA4, 0x42, 0xf7, 0x43, 0x81, 0xa3, 0xc9, 0xcd, 0x88, 0x89, 0x70, 0x58, 0xac, 0x73, 0x0, 0x0}},
+		"partial stun message":			 {data: []byte{0x0, 0x16, 0x02, 0xDC, 0x21, 0x12, 0xA4, 0x42, 0x0, 0x0, 0x0}, err: errIncompleteTURNFrame},
+		"stun message":				 {data: []byte{0x0, 0x16, 0x00, 0x02, 0x21, 0x12, 0xA4, 0x42, 0xf7, 0x43, 0x81, 0xa3, 0xc9, 0xcd, 0x88, 0x89, 0x70, 0x58, 0xac, 0x73, 0x0, 0x0}},
 	}
 
 	for name, cs := range cases {

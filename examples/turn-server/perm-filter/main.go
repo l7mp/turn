@@ -9,7 +9,7 @@ import (
 	"flag"
 	"log"
 	"net"
-        "strings"
+	"strings"
 	"os"
 	"os/signal"
 	"regexp"
@@ -64,21 +64,21 @@ func main() {
 				PacketConn: udpListener,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP(*publicIP), // Claim that we are listening on IP passed by user (This should be your Public IP)
-					Address:      "0.0.0.0",              // But actually be listening on every interface
+					Address:      "0.0.0.0",	      // But actually be listening on every interface
 				},
-                                // allow peer connections only to the client's own (host or server-reflexive) IP
-                                PermissionHandler: func(clientAddr net.Addr, peerIP net.IP) bool {
-                                        clientIP := strings.SplitN(clientAddr.String(), ":", 2)
-                                        if clientIP[0] != peerIP.String() {
-                                                log.Printf("Blocking request from client IP %s to peer %s",
-                                                        clientIP[0], peerIP.String())
-                                                return false
-                                        }
+				// allow peer connections only to the client's own (host or server-reflexive) IP
+				PermissionHandler: func(clientAddr net.Addr, peerIP net.IP) bool {
+					clientIP := strings.SplitN(clientAddr.String(), ":", 2)
+					if clientIP[0] != peerIP.String() {
+						log.Printf("Blocking request from client IP %s to peer %s",
+							clientIP[0], peerIP.String())
+						return false
+					}
 
-                                        log.Printf("Admitting request from client IP %s to peer %s",
-                                                clientIP[0], peerIP.String())
-                                        return true
-                                },
+					log.Printf("Admitting request from client IP %s to peer %s",
+						clientIP[0], peerIP.String())
+					return true
+				},
 			},
 		},
 	})

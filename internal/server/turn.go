@@ -323,7 +323,7 @@ func handleChannelBindRequest(r Request, m *stun.Message) error {
 		return buildAndSendErr(r.Conn, r.SrcAddr, err, badRequestMsg...)
 	}
 
-        if err := r.AllocationManager.GrantPermission(r.SrcAddr, peerAddr.IP); err != nil {
+	if err := r.AllocationManager.GrantPermission(r.SrcAddr, peerAddr.IP); err != nil {
                 r.Log.Infof("permission denied for client %s to peer %s", r.SrcAddr.String(),
                         peerAddr.IP.String())
                 
