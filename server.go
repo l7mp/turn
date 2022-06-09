@@ -66,7 +66,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 	for i := range s.packetConnConfigs {
 		go func(i int, p PacketConnConfig) {
-			var permissionHandler PermissionHandler = p.PermissionHandler
+			permissionHandler := p.PermissionHandler
 			if permissionHandler == nil {
 				permissionHandler = DefaultPermissionHandler
 			}
@@ -94,7 +94,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 	for i, listener := range s.listenerConfigs {
 		go func(i int, l ListenerConfig) {
-			var permissionHandler PermissionHandler = l.PermissionHandler
+			permissionHandler := l.PermissionHandler
 			if permissionHandler == nil {
 				permissionHandler = DefaultPermissionHandler
 			}
