@@ -11,9 +11,9 @@ import (
 
 // ManagerConfig a bag of config params for Manager.
 type ManagerConfig struct {
-	LeveledLogger	   logging.LeveledLogger
+	LeveledLogger      logging.LeveledLogger
 	AllocatePacketConn func(network string, requestedPort int) (net.PacketConn, net.Addr, error)
-	AllocateConn	   func(network string, requestedPort int) (net.Conn, net.Addr, error)
+	AllocateConn       func(network string, requestedPort int) (net.Conn, net.Addr, error)
 	PermissionHandler  func(sourceAddr net.Addr, peerIP net.IP) bool
 }
 
@@ -31,7 +31,7 @@ type Manager struct {
 	reservations []*reservation
 
 	allocatePacketConn func(network string, requestedPort int) (net.PacketConn, net.Addr, error)
-	allocateConn	   func(network string, requestedPort int) (net.Conn, net.Addr, error)
+	allocateConn       func(network string, requestedPort int) (net.Conn, net.Addr, error)
 	permissionHandler  func(sourceAddr net.Addr, peerIP net.IP) bool
 }
 
@@ -47,10 +47,10 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	}
 
 	return &Manager{
-		log:		    config.LeveledLogger,
-		allocations:	    make(map[string]*Allocation, 64),
+		log:                config.LeveledLogger,
+		allocations:        make(map[string]*Allocation, 64),
 		allocatePacketConn: config.AllocatePacketConn,
-		allocateConn:	    config.AllocateConn,
+		allocateConn:       config.AllocateConn,
 		permissionHandler:  config.PermissionHandler,
 	}, nil
 }
@@ -206,7 +206,7 @@ func (m *Manager) GrantPermission(sourceAddr net.Addr, peerIP net.IP) error {
 	if m.permissionHandler == nil {
 		return nil
 	}
-	
+
 	if m.permissionHandler(sourceAddr, peerIP) {
 		return nil
 	}

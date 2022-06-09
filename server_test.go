@@ -49,7 +49,7 @@ func TestServer(t *testing.T) {
 					},
 				},
 			},
-			Realm:	       "pion.ly",
+			Realm:         "pion.ly",
 			LoggerFactory: loggerFactory,
 		})
 		assert.NoError(t, err)
@@ -60,7 +60,7 @@ func TestServer(t *testing.T) {
 		assert.NoError(t, err)
 
 		client, err := NewClient(&ClientConfig{
-			Conn:	       conn,
+			Conn:          conn,
 			LoggerFactory: loggerFactory,
 		})
 		assert.NoError(t, err)
@@ -139,7 +139,7 @@ func TestServer(t *testing.T) {
 					},
 				},
 			},
-			Realm:	       "pion.ly",
+			Realm:         "pion.ly",
 			LoggerFactory: loggerFactory,
 		})
 		assert.NoError(t, err)
@@ -151,11 +151,11 @@ func TestServer(t *testing.T) {
 		client, err := NewClient(&ClientConfig{
 			STUNServerAddr: "127.0.0.1:3478",
 			TURNServerAddr: "127.0.0.1:3478",
-			Conn:		conn,
-			Username:	"user",
-			Password:	"pass",
-			Realm:		"pion.ly",
-			LoggerFactory:	loggerFactory,
+			Conn:           conn,
+			Username:       "user",
+			Password:       "pass",
+			Realm:          "pion.ly",
+			LoggerFactory:  loggerFactory,
 		})
 		assert.NoError(t, err)
 		assert.NoError(t, client.Listen())
@@ -218,11 +218,11 @@ func TestServer(t *testing.T) {
 		client2, err := NewClient(&ClientConfig{
 			STUNServerAddr: "127.0.0.1:3478",
 			TURNServerAddr: "127.0.0.1:3478",
-			Conn:		conn2,
-			Username:	"user",
-			Password:	"pass",
-			Realm:		"pion.ly",
-			LoggerFactory:	loggerFactory,
+			Conn:           conn2,
+			Username:       "user",
+			Password:       "pass",
+			Realm:          "pion.ly",
+			LoggerFactory:  loggerFactory,
 		})
 		assert.NoError(t, err)
 		assert.NoError(t, client2.Listen())
@@ -287,7 +287,7 @@ func buildVNet() (*VNet, error) {
 
 	// WAN
 	wan, err := vnet.NewRouter(&vnet.RouterConfig{
-		CIDR:	       "0.0.0.0/0",
+		CIDR:          "0.0.0.0/0",
 		LoggerFactory: loggerFactory,
 	})
 	if err != nil {
@@ -315,7 +315,7 @@ func buildVNet() (*VNet, error) {
 	// LAN
 	lan, err := vnet.NewRouter(&vnet.RouterConfig{
 		StaticIP: "5.6.7.8", // this router's external IP on eth0
-		CIDR:	  "192.168.0.0/24",
+		CIDR:     "192.168.0.0/24",
 		NATType: &vnet.NATType{
 			MappingBehavior:   vnet.EndpointIndependent,
 			FilteringBehavior: vnet.EndpointIndependent,
@@ -361,7 +361,7 @@ func buildVNet() (*VNet, error) {
 				PacketConn: udpListener,
 				RelayAddressGenerator: &RelayAddressGeneratorNone{
 					Address: "1.2.3.4",
-					Net:	 net0,
+					Net:     net0,
 				},
 			},
 		},
@@ -386,10 +386,10 @@ func buildVNet() (*VNet, error) {
 	}
 
 	return &VNet{
-		wan:	wan,
-		net0:	net0,
-		net1:	net1,
-		netL0:	netL0,
+		wan:    wan,
+		net0:   net0,
+		net1:   net1,
+		netL0:  netL0,
 		server: server,
 	}, nil
 }
@@ -420,9 +420,9 @@ func TestServerVNet(t *testing.T) {
 		log.Debug("creating a client.")
 		client, err := NewClient(&ClientConfig{
 			STUNServerAddr: "1.2.3.4:3478",
-			Conn:		lconn,
-			Net:		v.netL0,
-			LoggerFactory:	loggerFactory,
+			Conn:           lconn,
+			Net:            v.netL0,
+			LoggerFactory:  loggerFactory,
 		})
 		assert.NoError(t, err, "should succeed")
 		assert.NoError(t, client.Listen(), "should succeed")
@@ -451,11 +451,11 @@ func TestServerVNet(t *testing.T) {
 		client, err := NewClient(&ClientConfig{
 			STUNServerAddr: "stun.pion.ly:3478",
 			TURNServerAddr: "turn.pion.ly:3478",
-			Username:	"user",
-			Password:	"pass",
-			Conn:		lconn,
-			Net:		v.netL0,
-			LoggerFactory:	loggerFactory,
+			Username:       "user",
+			Password:       "pass",
+			Conn:           lconn,
+			Net:            v.netL0,
+			LoggerFactory:  loggerFactory,
 		})
 
 		assert.NoError(t, err)
@@ -523,10 +523,10 @@ func TestConsumeSingleTURNFrame(t *testing.T) {
 		err  error
 	}
 	cases := map[string]testCase{
-		"channel data":					{data: []byte{0x40, 0x01, 0x00, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, err: nil},
-		"partial data less than channel header":	{data: []byte{1}, err: errIncompleteTURNFrame},
-		"partial stun message":				{data: []byte{0x0, 0x16, 0x02, 0xDC, 0x21, 0x12, 0xA4, 0x42, 0x0, 0x0, 0x0}, err: errIncompleteTURNFrame},
-		"stun message":					{data: []byte{0x0, 0x16, 0x00, 0x02, 0x21, 0x12, 0xA4, 0x42, 0xf7, 0x43, 0x81, 0xa3, 0xc9, 0xcd, 0x88, 0x89, 0x70, 0x58, 0xac, 0x73, 0x0, 0x0}},
+		"channel data":                          {data: []byte{0x40, 0x01, 0x00, 0x08, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, err: nil},
+		"partial data less than channel header": {data: []byte{1}, err: errIncompleteTURNFrame},
+		"partial stun message":                  {data: []byte{0x0, 0x16, 0x02, 0xDC, 0x21, 0x12, 0xA4, 0x42, 0x0, 0x0, 0x0}, err: errIncompleteTURNFrame},
+		"stun message":                          {data: []byte{0x0, 0x16, 0x00, 0x02, 0x21, 0x12, 0xA4, 0x42, 0xf7, 0x43, 0x81, 0xa3, 0xc9, 0xcd, 0x88, 0x89, 0x70, 0x58, 0xac, 0x73, 0x0, 0x0}},
 	}
 
 	for name, cs := range cases {

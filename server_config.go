@@ -103,7 +103,7 @@ type ServerConfig struct {
 	// PacketConnConfigs and ListenerConfigs are a list of all the turn listeners
 	// Each listener can have custom behavior around the creation of Relays
 	PacketConnConfigs []PacketConnConfig
-	ListenerConfigs	  []ListenerConfig
+	ListenerConfigs   []ListenerConfig
 
 	// LoggerFactory must be set for logging from this server.
 	LoggerFactory logging.LoggerFactory

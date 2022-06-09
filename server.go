@@ -19,14 +19,14 @@ const (
 
 // Server is an instance of the Pion TURN Server
 type Server struct {
-	log		   logging.LeveledLogger
-	authHandler	   AuthHandler
-	realm		   string
+	log                logging.LeveledLogger
+	authHandler        AuthHandler
+	realm              string
 	channelBindTimeout time.Duration
-	nonces		   *sync.Map
+	nonces             *sync.Map
 
 	packetConnConfigs  []PacketConnConfig
-	listenerConfigs	   []ListenerConfig
+	listenerConfigs    []ListenerConfig
 	allocationManagers []*allocation.Manager
 
 	inboundMTU int
@@ -49,15 +49,15 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 
 	s := &Server{
-		log:		    loggerFactory.NewLogger("turn"),
-		authHandler:	    config.AuthHandler,
-		realm:		    config.Realm,
+		log:                loggerFactory.NewLogger("turn"),
+		authHandler:        config.AuthHandler,
+		realm:              config.Realm,
 		channelBindTimeout: config.ChannelBindTimeout,
 		packetConnConfigs:  config.PacketConnConfigs,
 		listenerConfigs:    config.ListenerConfigs,
 		allocationManagers: make([]*allocation.Manager, len(config.PacketConnConfigs)+len(config.ListenerConfigs)),
-		nonces:		    &sync.Map{},
-		inboundMTU:	    mtu,
+		nonces:             &sync.Map{},
+		inboundMTU:         mtu,
 	}
 
 	if s.channelBindTimeout == 0 {
@@ -73,9 +73,9 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 			allocationManager, err := allocation.NewManager(allocation.ManagerConfig{
 				AllocatePacketConn: p.RelayAddressGenerator.AllocatePacketConn,
-				AllocateConn:	    p.RelayAddressGenerator.AllocateConn,
+				AllocateConn:       p.RelayAddressGenerator.AllocateConn,
 				PermissionHandler:  permissionHandler,
-				LeveledLogger:	    s.log,
+				LeveledLogger:      s.log,
 			})
 			if err != nil {
 				s.log.Errorf("exit read loop on error: %s", err.Error())
@@ -101,9 +101,9 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 			allocationManager, err := allocation.NewManager(allocation.ManagerConfig{
 				AllocatePacketConn: l.RelayAddressGenerator.AllocatePacketConn,
-				AllocateConn:	    l.RelayAddressGenerator.AllocateConn,
+				AllocateConn:       l.RelayAddressGenerator.AllocateConn,
 				PermissionHandler:  permissionHandler,
-				LeveledLogger:	    s.log,
+				LeveledLogger:      s.log,
 			})
 			if err != nil {
 				s.log.Errorf("exit read loop on error: %s", err.Error())
@@ -183,15 +183,15 @@ func (s *Server) readLoop(p net.PacketConn, allocationManager *allocation.Manage
 		}
 
 		if err := server.HandleRequest(server.Request{
-			Conn:		    p,
-			SrcAddr:	    addr,
-			Buff:		    buf[:n],
-			Log:		    s.log,
-			AuthHandler:	    s.authHandler,
-			Realm:		    s.realm,
+			Conn:               p,
+			SrcAddr:            addr,
+			Buff:               buf[:n],
+			Log:                s.log,
+			AuthHandler:        s.authHandler,
+			Realm:              s.realm,
 			AllocationManager:  allocationManager,
 			ChannelBindTimeout: s.channelBindTimeout,
-			Nonces:		    s.nonces,
+			Nonces:             s.nonces,
 		}); err != nil {
 			s.log.Errorf("error when handling datagram: %v", err)
 		}

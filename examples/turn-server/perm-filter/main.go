@@ -9,11 +9,11 @@ import (
 	"flag"
 	"log"
 	"net"
-	"strings"
 	"os"
 	"os/signal"
 	"regexp"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/pion/turn/v2"
@@ -64,7 +64,7 @@ func main() {
 				PacketConn: udpListener,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP(*publicIP), // Claim that we are listening on IP passed by user (This should be your Public IP)
-					Address:      "0.0.0.0",	      // But actually be listening on every interface
+					Address:      "0.0.0.0",              // But actually be listening on every interface
 				},
 				// allow peer connections only to the client's own (host or server-reflexive) IP
 				PermissionHandler: func(clientAddr net.Addr, peerIP net.IP) bool {
