@@ -67,22 +67,11 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 	for i := range s.packetConnConfigs {
 		go func(i int, p PacketConnConfig) {
-			permissionHandler := p.PermissionHandler
-			if permissionHandler == nil {
-				permissionHandler = DefaultPermissionHandler
-			}
-
-			allocationManager, err := allocation.NewManager(allocation.ManagerConfig{
-				AllocatePacketConn: p.RelayAddressGenerator.AllocatePacketConn,
-				AllocateConn:       p.RelayAddressGenerator.AllocateConn,
-				PermissionHandler:  permissionHandler,
-				LeveledLogger:      s.log,
-			})
+			allocationManager, err := s.createAllocationManager(i, p.RelayAddressGenerator, p.PermissionHandler)
 			if err != nil {
 				s.log.Errorf("exit read loop on error: %s", err.Error())
 				return
 			}
-			s.allocationManagers[i] = allocationManager
 			defer func() {
 				if err := allocationManager.Close(); err != nil {
 					s.log.Errorf("Failed to close AllocationManager: %s", err.Error())
@@ -105,22 +94,11 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 	for i, listener := range s.listenerConfigs {
 		go func(i int, l ListenerConfig) {
-			permissionHandler := l.PermissionHandler
-			if permissionHandler == nil {
-				permissionHandler = DefaultPermissionHandler
-			}
-
-			allocationManager, err := allocation.NewManager(allocation.ManagerConfig{
-				AllocatePacketConn: l.RelayAddressGenerator.AllocatePacketConn,
-				AllocateConn:       l.RelayAddressGenerator.AllocateConn,
-				PermissionHandler:  permissionHandler,
-				LeveledLogger:      s.log,
-			})
+			allocationManager, err := s.createAllocationManager(i, l.RelayAddressGenerator, l.PermissionHandler)
 			if err != nil {
 				s.log.Errorf("exit read loop on error: %s", err.Error())
 				return
 			}
-			s.allocationManagers[i] = allocationManager
 			defer func() {
 				if err := allocationManager.Close(); err != nil {
 					s.log.Errorf("Failed to close AllocationManager: %s", err.Error())
@@ -150,6 +128,26 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 
 	return s, nil
+}
+
+// createAllocationManager return allocation Manager.
+func (s *Server) createAllocationManager(i int, addrGenerator RelayAddressGenerator, handler PermissionHandler) (*allocation.Manager, error) {
+	permissionHandler := handler
+	if permissionHandler == nil {
+		permissionHandler = DefaultPermissionHandler
+	}
+
+	allocationManager, err := allocation.NewManager(allocation.ManagerConfig{
+		AllocatePacketConn: addrGenerator.AllocatePacketConn,
+		AllocateConn:       addrGenerator.AllocateConn,
+		PermissionHandler:  permissionHandler,
+		LeveledLogger:      s.log,
+	})
+	if err != nil {
+		return allocationManager, err
+	}
+	s.allocationManagers[i] = allocationManager
+	return allocationManager, err
 }
 
 // AllocationCount returns the number of active allocations. It can be used to drain the server before closing
