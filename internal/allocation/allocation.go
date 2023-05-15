@@ -13,6 +13,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/stun"
 	"github.com/pion/turn/v2/internal/ipnet"
+	"github.com/pion/turn/v2/internal/offload"
 	"github.com/pion/turn/v2/internal/proto"
 )
 
@@ -121,6 +122,18 @@ func (a *Allocation) AddChannelBind(c *ChannelBind, lifetime time.Duration) erro
 		a.channelBindings = append(a.channelBindings, c)
 		c.start(lifetime)
 
+		// enable offload
+		if offload.Engine != nil {
+			// TODO: use FiveTuple + int channelid
+			// TODO: enable TCP/etc. support
+			peer := offload.NewConnection(c.Peer.(*net.UDPAddr), a.RelayAddr.(*net.UDPAddr), 0)
+			client := offload.NewConnection(a.fiveTuple.SrcAddr.(*net.UDPAddr), a.fiveTuple.DstAddr.(*net.UDPAddr), uint32(c.Number))
+			err := offload.Engine.Upsert(peer, client, []string{})
+			if err != nil {
+				offload.Engine.Logger().Errorf("failed to init offload between peer: %+v and client: %+v due to: %s", peer, client, err)
+			}
+		}
+
 		// Channel binds also refresh permissions.
 		a.AddPermission(NewPermission(c.Peer, a.log))
 	} else {
@@ -138,14 +151,30 @@ func (a *Allocation) RemoveChannelBind(number proto.ChannelNumber) bool {
 	a.channelBindingsLock.Lock()
 	defer a.channelBindingsLock.Unlock()
 
+	var cAddr net.Addr
+	ret := false
+
 	for i := len(a.channelBindings) - 1; i >= 0; i-- {
 		if a.channelBindings[i].Number == number {
+			cAddr = a.channelBindings[i].Peer
 			a.channelBindings = append(a.channelBindings[:i], a.channelBindings[i+1:]...)
-			return true
+			ret = true
+			break
 		}
 	}
 
-	return false
+	// disable offload
+	if offload.Engine != nil {
+		// TODO: use FiveTuple + int channelid
+		peer := offload.NewConnection(cAddr.(*net.UDPAddr), a.RelayAddr.(*net.UDPAddr), uint32(number))
+		client := offload.NewConnection(a.RelayAddr.(*net.UDPAddr), cAddr.(*net.UDPAddr), 0)
+		err := offload.Engine.Remove(peer, client)
+		if err == nil {
+			ret = true
+		}
+	}
+
+	return ret
 }
 
 // GetChannelByNumber gets the ChannelBind from this allocation by id
