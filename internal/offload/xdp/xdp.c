@@ -73,7 +73,7 @@ struct {
 	__type(value, struct FourTuple);
 } turn_server_upstream_map SEC(".maps");
 
-//fourtuple stats
+// fourtuple stats
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__uint(max_entries, MAX_MAP_ENTRIES);
@@ -81,7 +81,6 @@ struct {
 	__type(key, struct FourTuple);
 	__type(value, struct FourTupleStat);
 } turn_server_stats_map SEC(".maps");
-
 
 SEC("xdp")
 int xdp_prog_func(struct xdp_md *ctx)
@@ -142,6 +141,12 @@ int xdp_prog_func(struct xdp_md *ctx)
 	// downstream?
 	struct FourTupleWithChannelId *out_tuplec_ds;
 	out_tuplec_ds = bpf_map_lookup_elem(&turn_server_downstream_map, &in_tuple);
+	if (!out_tuplec_ds) {
+		// to overcome the situation of TURN server not knowing its local IP address:
+		// try lookup with '0.0.0.0' too
+		in_tuple.local_ip = 0;
+		out_tuplec_ds = bpf_map_lookup_elem(&turn_server_downstream_map, &in_tuple);
+	}
 	if (out_tuplec_ds) {
 		chan_id = out_tuplec_ds->channel_id;
 		// add 4-byte space for the channel ID
@@ -211,12 +216,18 @@ int xdp_prog_func(struct xdp_md *ctx)
 		if ((__u8 *)udp_payload + 4 > (__u8 *)data_end) {
 			goto out;
 		}
-		chan_id = (bpf_ntohl(udp_payload[0])>>16) & 0xFFFF;
+		chan_id = (bpf_ntohl(udp_payload[0]) >> 16) & 0xFFFF;
 
 		// upstream?
 		struct FourTupleWithChannelId in_tuplec_us = {.four_tuple = in_tuple,
 							      .channel_id = chan_id};
 		out_tuple = bpf_map_lookup_elem(&turn_server_upstream_map, &in_tuplec_us);
+		if (!out_tuple) {
+			// to overcome the situation of TURN server not knowing its local IP address:
+			// try lookup with '0.0.0.0' too
+			in_tuplec_us.four_tuple.local_ip = 0;
+			out_tuple = bpf_map_lookup_elem(&turn_server_upstream_map, &in_tuplec_us);
+		}
 		if (!out_tuple) {
 			goto out;
 		}
