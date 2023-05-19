@@ -119,32 +119,34 @@ func (o *XdpEngine) Init() error {
 }
 
 // Shutdown stops the XDP offloading engine
-func (o *XdpEngine) Shutdown() error {
+func (o *XdpEngine) Shutdown() {
 	if !o.SetupDone {
-		return nil
+		return
 	}
 
 	// close objects
 	if err := o.objs.Close(); err != nil {
-		return err
+		o.log.Errorf("XDP: error during shutdown: %s", err)
+		return
 	}
 
 	// close links
 	for _, l := range o.links {
 		if err := l.Close(); err != nil {
-			return err
+			o.log.Errorf("XDP: error during shutdown: %s", err)
+			return
 		}
 	}
 
 	// unlink maps
 	if err := o.unpinMaps(); err != nil {
-		return err
+		o.log.Errorf("XDP: error during shutdown: %s", err)
+		return
 	}
 
 	o.SetupDone = false
 
 	o.log.Debug("XDP: shutdown done")
-	return nil
 }
 
 // Upsert creates a new XDP offload between a peer and a client

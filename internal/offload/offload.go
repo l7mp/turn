@@ -21,7 +21,7 @@ var Engine OffloadEngine
 type OffloadEngine interface {
 	Logger() logging.LeveledLogger
 	Init() error
-	Shutdown() error
+	Shutdown()
 	Upsert(peer, client Connection, metrics []string) error
 	Remove(peer, client Connection) error
 }

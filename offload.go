@@ -73,7 +73,6 @@ func newEngine(opt OffloadOptions) (offload.OffloadEngine, error) {
 }
 
 // ShutdownOffload shuts down the offloading engine
-func ShutdownOffload() error {
-	err := offload.Engine.Shutdown()
-	return err
+func ShutdownOffload() {
+	offload.Engine.Shutdown()
 }

@@ -26,12 +26,11 @@ func (o *DummyEngine) Init() error {
 }
 
 // Shutdown stops the dummy offloading engine
-func (o *DummyEngine) Shutdown() error {
+func (o *DummyEngine) Shutdown() {
 	if o.log == nil {
-		return nil
+		return
 	}
 	o.log.Debug("dummy: shutdown done")
-	return nil
 }
 
 // Upsert imitates an offload creation between a peer and a client
