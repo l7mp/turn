@@ -124,8 +124,7 @@ func (a *Allocation) AddChannelBind(c *ChannelBind, lifetime time.Duration) erro
 
 		// enable offload
 		if offload.Engine != nil {
-			// TODO: use FiveTuple + int channelid
-			// TODO: enable TCP/etc. support
+			// TODO: check if connection is UDP?
 			peer := offload.NewConnection(c.Peer.(*net.UDPAddr), a.RelayAddr.(*net.UDPAddr), 0)
 			client := offload.NewConnection(a.fiveTuple.SrcAddr.(*net.UDPAddr), a.fiveTuple.DstAddr.(*net.UDPAddr), uint32(c.Number))
 			err := offload.Engine.Upsert(peer, client, []string{})
@@ -165,7 +164,6 @@ func (a *Allocation) RemoveChannelBind(number proto.ChannelNumber) bool {
 
 	// disable offload
 	if offload.Engine != nil {
-		// TODO: use FiveTuple + int channelid
 		peer := offload.NewConnection(cAddr.(*net.UDPAddr), a.RelayAddr.(*net.UDPAddr), uint32(number))
 		client := offload.NewConnection(a.RelayAddr.(*net.UDPAddr), cAddr.(*net.UDPAddr), 0)
 		err := offload.Engine.Remove(peer, client)

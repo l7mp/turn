@@ -19,12 +19,10 @@ type OffloadOptions struct {
 	Mechanisms []string
 	// Interfaces on which to enable offload. Unless set, it is set to all available interfaces
 	Interfaces []net.Interface
-	// TODO: add metrics?
 }
 
 // InitOffload initializes offloading engine (e.g., eBPF kernel offload engine) to speed up networking
 func InitOffload(o OffloadOptions) error {
-	// TODO: add parameters: interfaces, preferred offload mechanisms, etc.
 	var err error
 	offload.Engine, err = newEngine(o)
 	if err != nil {

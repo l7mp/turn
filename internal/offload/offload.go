@@ -24,7 +24,6 @@ type OffloadEngine interface {
 	Shutdown() error
 	Upsert(peer, client Connection, metrics []string) error
 	Remove(peer, client Connection) error
-	// TODO: GetStat() ??
 }
 
 // Connection combines offload engine identifiers required for uinquely identifying Allocation channel bindings. Depending of the used offload engine, values might be nulled. For example, the SockFd has no role for an XDP offload.
