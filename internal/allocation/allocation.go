@@ -124,12 +124,20 @@ func (a *Allocation) AddChannelBind(c *ChannelBind, lifetime time.Duration) erro
 
 		// enable offload
 		if offload.Engine != nil {
-			// TODO: check if connection is UDP?
-			peer := offload.NewConnection(c.Peer.(*net.UDPAddr), a.RelayAddr.(*net.UDPAddr), 0)
-			client := offload.NewConnection(a.fiveTuple.SrcAddr.(*net.UDPAddr), a.fiveTuple.DstAddr.(*net.UDPAddr), uint32(c.Number))
-			err := offload.Engine.Upsert(peer, client, []string{})
-			if err != nil {
-				offload.Engine.Logger().Errorf("failed to init offload between peer: %+v and client: %+v due to: %s", peer, client, err)
+			// currently we support offload for UDP connections only
+			peer, peerOk := c.Peer.(*net.UDPAddr)
+			relay, relayOk := a.RelayAddr.(*net.UDPAddr)
+			src, srcOk := a.fiveTuple.SrcAddr.(*net.UDPAddr)
+			dst, dstOk := a.fiveTuple.DstAddr.(*net.UDPAddr)
+			if peerOk && relayOk && srcOk && dstOk {
+				peer := offload.NewConnection(peer, relay, 0)
+				client := offload.NewConnection(src, dst, uint32(c.Number))
+				err := offload.Engine.Upsert(peer, client, []string{})
+				if err != nil {
+					offload.Engine.Logger().Errorf("failed to init offload between peer: %+v and client: %+v due to: %s", peer, client, err)
+				}
+			} else {
+				offload.Engine.Logger().Infof("offload between non-UDP connections is not supported")
 			}
 		}
 
@@ -164,11 +172,15 @@ func (a *Allocation) RemoveChannelBind(number proto.ChannelNumber) bool {
 
 	// disable offload
 	if offload.Engine != nil {
-		peer := offload.NewConnection(cAddr.(*net.UDPAddr), a.RelayAddr.(*net.UDPAddr), uint32(number))
-		client := offload.NewConnection(a.RelayAddr.(*net.UDPAddr), cAddr.(*net.UDPAddr), 0)
-		err := offload.Engine.Remove(peer, client)
-		if err == nil {
-			ret = true
+		c, cOk := cAddr.(*net.UDPAddr)
+		r, rOk := a.RelayAddr.(*net.UDPAddr)
+		if cOk && rOk {
+			peer := offload.NewConnection(c, r, uint32(number))
+			client := offload.NewConnection(r, c, 0)
+			err := offload.Engine.Remove(peer, client)
+			if err == nil {
+				ret = true
+			}
 		}
 	}
 
