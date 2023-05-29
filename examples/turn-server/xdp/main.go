@@ -31,7 +31,7 @@ func main() {
 	// Create a UDP listener to pass into pion/turn
 	// pion/turn itself doesn't allocate any UDP sockets, but lets the user pass them in
 	// this allows us to add logging, storage or modify inbound/outbound traffic
-	udpListener, err := net.ListenPacket("udp4", "0.0.0.0:"+strconv.Itoa(*port))
+	udpListener, err := net.ListenPacket("udp4", *publicIP+":"+strconv.Itoa(*port))
 	if err != nil {
 		log.Panicf("Failed to create TURN server listener: %s", err)
 	}
@@ -68,7 +68,7 @@ func main() {
 				PacketConn: udpListener,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP(*publicIP), // Claim that we are listening on IP passed by user (This should be your Public IP)
-					Address:      "0.0.0.0",              // But actually be listening on every interface
+					Address:      *publicIP,
 				},
 			},
 		},
