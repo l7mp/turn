@@ -146,6 +146,7 @@ int xdp_prog_func(struct xdp_md *ctx)
 		// try lookup with '0.0.0.0' too
 		in_tuple.local_ip = 0;
 		out_tuplec_ds = bpf_map_lookup_elem(&turn_server_downstream_map, &in_tuple);
+		in_tuple.local_ip = iphdr->daddr;
 	}
 	if (out_tuplec_ds) {
 		chan_id = out_tuplec_ds->channel_id;
