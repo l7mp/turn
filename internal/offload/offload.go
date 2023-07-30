@@ -22,8 +22,8 @@ type OffloadEngine interface {
 	Logger() logging.LeveledLogger
 	Init() error
 	Shutdown()
-	Upsert(peer, client Connection, metrics []string) error
-	Remove(peer, client Connection) error
+	Upsert(client, peer Connection, metrics []string) error
+	Remove(client, peer Connection) error
 }
 
 // Connection combines offload engine identifiers required for uinquely identifying Allocation channel bindings. Depending of the used offload engine, values might be nulled. For example, the SockFd has no role for an XDP offload.

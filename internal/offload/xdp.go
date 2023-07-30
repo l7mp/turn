@@ -149,8 +149,8 @@ func (o *XdpEngine) Shutdown() {
 	o.log.Debug("XDP: shutdown done")
 }
 
-// Upsert creates a new XDP offload between a peer and a client
-func (o *XdpEngine) Upsert(peer, client Connection, _ []string) error {
+// Upsert creates a new XDP offload between a client and a peer
+func (o *XdpEngine) Upsert(client, peer Connection, _ []string) error {
 	p := xdp.BpfFourTuple{
 		RemoteIp:   HostToNetLong(peer.RemoteIP),
 		LocalIp:    HostToNetLong(peer.LocalIP),
@@ -176,12 +176,12 @@ func (o *XdpEngine) Upsert(peer, client Connection, _ []string) error {
 		return err
 	}
 
-	o.log.Debugf("XDP: create offload between peer: %+v and client: %+v", p, c)
+	o.log.Debugf("XDP: create offload between client: %+v and peer: %+v", c, p)
 	return nil
 }
 
-// Remove removes an XDP offload between a peer and a client
-func (o *XdpEngine) Remove(peer, client Connection) error {
+// Remove removes an XDP offload between a client and a peer
+func (o *XdpEngine) Remove(client, peer Connection) error {
 	p := xdp.BpfFourTuple{
 		RemoteIp:   HostToNetLong(peer.RemoteIP),
 		LocalIp:    HostToNetLong(peer.LocalIP),
@@ -206,7 +206,7 @@ func (o *XdpEngine) Remove(peer, client Connection) error {
 		return err
 	}
 
-	o.log.Debugf("XDP: remove offload between peer: %+v and client: %+v", p, c)
+	o.log.Debugf("XDP: remove offload between client: %+v and peer: %+v", c, p)
 	return nil
 }
 

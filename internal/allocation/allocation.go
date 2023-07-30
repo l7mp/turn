@@ -132,9 +132,9 @@ func (a *Allocation) AddChannelBind(c *ChannelBind, lifetime time.Duration) erro
 			if peerOk && relayOk && srcOk && dstOk {
 				peer := offload.NewConnection(peer, relay, 0)
 				client := offload.NewConnection(src, dst, uint32(c.Number))
-				err := offload.Engine.Upsert(peer, client, []string{})
+				err := offload.Engine.Upsert(client, peer, []string{})
 				if err != nil {
-					offload.Engine.Logger().Errorf("failed to init offload between peer: %+v and client: %+v due to: %s", peer, client, err)
+					offload.Engine.Logger().Errorf("failed to init offload between client: %+v and peer: %+v due to: %s", client, peer, err)
 				}
 			} else {
 				offload.Engine.Logger().Infof("offload between non-UDP connections is not supported")
@@ -177,7 +177,7 @@ func (a *Allocation) RemoveChannelBind(number proto.ChannelNumber) bool {
 		if cOk && rOk {
 			peer := offload.NewConnection(c, r, uint32(number))
 			client := offload.NewConnection(r, c, 0)
-			err := offload.Engine.Remove(peer, client)
+			err := offload.Engine.Remove(client, peer)
 			if err == nil {
 				ret = true
 			}

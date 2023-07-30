@@ -33,14 +33,14 @@ func (o *DummyEngine) Shutdown() {
 	o.log.Debug("dummy: shutdown done")
 }
 
-// Upsert imitates an offload creation between a peer and a client
-func (o *DummyEngine) Upsert(peer, client Connection, _ []string) error {
-	o.log.Debugf("dummy: would create offload between peer: %+v and client: %+v", peer, client)
+// Upsert imitates an offload creation between a client and a peer
+func (o *DummyEngine) Upsert(client, peer Connection, _ []string) error {
+	o.log.Debugf("dummy: would create offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
 
-// Remove imitates offload deletion between a peer and a client
-func (o *DummyEngine) Remove(peer, client Connection) error {
-	o.log.Debugf("dummy: would remove offload between peer: %+v and client: %+v", peer, client)
+// Remove imitates offload deletion between a client and a peer
+func (o *DummyEngine) Remove(client, peer Connection) error {
+	o.log.Debugf("dummy: would remove offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
