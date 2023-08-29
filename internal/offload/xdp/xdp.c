@@ -33,6 +33,8 @@ struct FourTupleStat {
 	__u64 timestamp_last;
 };
 
+enum ChanHdrAction { HDR_ADD, HDR_REMOVE };
+
 // TURN                                TURN           Peer          Peer
 // client                              server          A             B
 //   |                                   |             |             |
@@ -100,6 +102,8 @@ int xdp_prog_func(struct xdp_md *ctx)
 	struct FourTuple *out_tuple = NULL;
 	__u32 chan_id;
 	__u32 *udp_payload;
+	__u32 chan_data_hdr;
+	enum ChanHdrAction chan_hdr_action;
 	struct FourTupleStat *stat;
 	struct FourTupleStat stat_new;
 
@@ -208,6 +212,8 @@ int xdp_prog_func(struct xdp_md *ctx)
 			goto out;
 		}
 		udp_payload[0] = bpf_htonl(((__u16)chan_id << 16) | (__u16)(udp_len - 4));
+		chan_data_hdr = udp_payload[0];
+		chan_hdr_action = HDR_ADD;
 
 		out_tuple = &out_tuplec_ds->four_tuple;
 	} else {
@@ -218,6 +224,8 @@ int xdp_prog_func(struct xdp_md *ctx)
 			goto out;
 		}
 		chan_id = (bpf_ntohl(udp_payload[0]) >> 16) & 0xFFFF;
+		chan_data_hdr = udp_payload[0];
+		chan_hdr_action = HDR_REMOVE;
 
 		// upstream?
 		struct FourTupleWithChannelId in_tuplec_us = {.four_tuple = in_tuple,
@@ -297,7 +305,6 @@ int xdp_prog_func(struct xdp_md *ctx)
 	// update UDP len: payload + header size
 	short old_udp_len = udphdr->len;
 	udphdr->len = bpf_htons(bpf_ntohs(udphdr->len) + len_diff);
-	udphdr->check = update_udp_checksum(udphdr->check, old_udp_len, udphdr->len);
 
 	/* Update IP addresses */
 	old_saddr = iphdr->saddr;
@@ -311,13 +318,21 @@ int xdp_prog_func(struct xdp_md *ctx)
 	udphdr->check = update_udp_checksum(udphdr->check, old_saddr, iphdr->saddr);
 	udphdr->check = update_udp_checksum(udphdr->check, old_daddr, iphdr->daddr);
 
-	/* Update UDP ports */
+	/* Update UDP ports and checksum*/
 	udphdr->source = out_tuple->local_port;
 	udphdr->dest = out_tuple->remote_port;
 	udphdr->check = update_udp_checksum(udphdr->check, in_tuple.local_port, udphdr->source);
 	udphdr->check = update_udp_checksum(udphdr->check, in_tuple.remote_port, udphdr->dest);
 
-	udphdr->check = 0;
+	udphdr->check = update_udp_checksum(udphdr->check, old_udp_len, udphdr->len);
+
+	if (chan_hdr_action == HDR_ADD) {
+		udphdr->check = update_udp_checksum(udphdr->check, 0, chan_data_hdr);
+		udphdr->check = bpf_htons(bpf_ntohs(udphdr->check) - 4);
+	} else if (chan_hdr_action == HDR_REMOVE) {
+		udphdr->check = update_udp_checksum(udphdr->check, chan_data_hdr, 0);
+		udphdr->check = bpf_htons(bpf_ntohs(udphdr->check) + 4);
+	}
 
 	/* Redirect */
 	fib_params.family = AF_INET;
