@@ -134,10 +134,10 @@ func (a *Allocation) AddChannelBind(c *ChannelBind, lifetime time.Duration) erro
 				client := offload.NewConnection(src, dst, uint32(c.Number))
 				err := offload.Engine.Upsert(client, peer, []string{})
 				if err != nil {
-					offload.Engine.Logger().Errorf("failed to init offload between client: %+v and peer: %+v due to: %s", client, peer, err)
+					offload.Engine.Logger().Errorf("Failed to init offload between client: %+v and peer: %+v due to: %s", client, peer, err)
 				}
 			} else {
-				offload.Engine.Logger().Infof("offload between non-UDP connections is not supported")
+				offload.Engine.Logger().Infof("Offload between non-UDP connections is not supported")
 			}
 		}
 

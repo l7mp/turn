@@ -21,7 +21,7 @@ func (o *DummyEngine) Logger() logging.LeveledLogger {
 
 // Init initializes the Dummy engine
 func (o *DummyEngine) Init() error {
-	o.log.Debug("dummy: init done")
+	o.log.Info("Init done")
 	return nil
 }
 
@@ -30,17 +30,17 @@ func (o *DummyEngine) Shutdown() {
 	if o.log == nil {
 		return
 	}
-	o.log.Debug("dummy: shutdown done")
+	o.log.Info("Shutdown done")
 }
 
 // Upsert imitates an offload creation between a client and a peer
 func (o *DummyEngine) Upsert(client, peer Connection, _ []string) error {
-	o.log.Debugf("dummy: would create offload between client: %+v and peer: %+v", client, peer)
+	o.log.Debugf("Would create offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
 
 // Remove imitates offload deletion between a client and a peer
 func (o *DummyEngine) Remove(client, peer Connection) error {
-	o.log.Debugf("dummy: would remove offload between client: %+v and peer: %+v", client, peer)
+	o.log.Debugf("Would remove offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }

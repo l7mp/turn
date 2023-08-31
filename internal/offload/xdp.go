@@ -100,6 +100,7 @@ func (o *XdpEngine) Init() error {
 	o.upstreamMap = o.objs.TurnServerUpstreamMap
 	o.statsMap = o.objs.TurnServerStatsMap
 
+	ifNames := []string{}
 	// Attach program to interfaces
 	for _, iface := range o.Interfaces {
 		l, err := link.AttachXDP(link.XDPOptions{
@@ -110,11 +111,12 @@ func (o *XdpEngine) Init() error {
 			return err
 		}
 		o.links = append(o.links, l)
+		ifNames = append(ifNames, iface.Name)
 	}
 
 	o.SetupDone = true
 
-	o.log.Debug("XDP: init done")
+	o.log.Infof("Init done on interfaces: %s", ifNames)
 	return nil
 }
 
@@ -126,27 +128,27 @@ func (o *XdpEngine) Shutdown() {
 
 	// close objects
 	if err := o.objs.Close(); err != nil {
-		o.log.Errorf("XDP: error during shutdown: %s", err)
+		o.log.Errorf("Error during shutdown: %s", err.Error())
 		return
 	}
 
 	// close links
 	for _, l := range o.links {
 		if err := l.Close(); err != nil {
-			o.log.Errorf("XDP: error during shutdown: %s", err)
+			o.log.Errorf("Error during shutdown: %s", err.Error())
 			return
 		}
 	}
 
 	// unlink maps
 	if err := o.unpinMaps(); err != nil {
-		o.log.Errorf("XDP: error during shutdown: %s", err)
+		o.log.Errorf("Error during shutdown: %s", err.Error())
 		return
 	}
 
 	o.SetupDone = false
 
-	o.log.Debug("XDP: shutdown done")
+	o.log.Info("Shutdown done")
 }
 
 // Upsert creates a new XDP offload between a client and a peer
@@ -168,15 +170,15 @@ func (o *XdpEngine) Upsert(client, peer Connection, _ []string) error {
 	}
 
 	if err := o.downstreamMap.Put(p, c); err != nil {
-		o.log.Errorf("error in upsert (downstream map): %s", err.Error())
+		o.log.Errorf("Error in upsert (downstream map): %s", err.Error())
 		return err
 	}
 	if err := o.upstreamMap.Put(c, p); err != nil {
-		o.log.Errorf("error in upsert (upstream map): %s", err.Error())
+		o.log.Errorf("Error in upsert (upstream map): %s", err.Error())
 		return err
 	}
 
-	o.log.Debugf("XDP: create offload between client: %+v and peer: %+v", c, p)
+	o.log.Debugf("Create offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
 
@@ -206,7 +208,7 @@ func (o *XdpEngine) Remove(client, peer Connection) error {
 		return err
 	}
 
-	o.log.Debugf("XDP: remove offload between client: %+v and peer: %+v", c, p)
+	o.log.Debugf("Remove offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
 
@@ -222,10 +224,10 @@ func (o *XdpEngine) GetStat(con Connection) error {
 	s := xdp.BpfFourTupleStat{}
 	var err error
 	if err = o.statsMap.Lookup(c, &s); err != nil {
-		o.log.Errorf("XDP: get stats error: %s", err)
+		o.log.Errorf("Get stats error: %s", err)
 		s = xdp.BpfFourTupleStat{Pkts: 0, Bytes: 0, TimestampLast: 0}
 	}
-	o.log.Infof("XDP: %+v stats: %+v", c, s)
+	o.log.Infof("%+v stats: %+v", c, s)
 
 	return err
 }

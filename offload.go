@@ -57,9 +57,9 @@ func newEngine(opt OffloadOptions) (offload.OffloadEngine, error) {
 			// no offload
 			off, err = offload.NewDummyEngine(opt.Log)
 		default:
-			opt.Log.Error("error: unsupported mechanism")
+			opt.Log.Error("unsupported mechanism")
 			//nolint:goerr113
-			off, err = nil, errors.New("error: unsupported mechanism")
+			off, err = nil, errors.New("unsupported mechanism")
 		}
 		if off != nil && err == nil {
 			break
