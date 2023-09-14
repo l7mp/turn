@@ -15,7 +15,7 @@ type OffloadOptions struct {
 	// Mechanisms are the offload mechanisms to be used. First element has the highest priority.
 	// Available mechanisms are:
 	// - "xdp": XDP/eBPF offload for UDP traffic
-	// - "dummy": no offload
+	// - "null": no offload
 	Mechanisms []string
 	// Interfaces on which to enable offload. Unless set, it is set to all available interfaces
 	Interfaces []net.Interface
@@ -36,7 +36,7 @@ func InitOffload(o OffloadOptions) error {
 func newEngine(opt OffloadOptions) (offload.OffloadEngine, error) {
 	// set defaults
 	if len(opt.Mechanisms) == 0 {
-		opt.Mechanisms = []string{"xdp", "dummy"}
+		opt.Mechanisms = []string{"xdp", "null"}
 	}
 	if len(opt.Interfaces) == 0 {
 		ifs, err := net.Interfaces()
@@ -53,9 +53,9 @@ func newEngine(opt OffloadOptions) (offload.OffloadEngine, error) {
 		case "xdp":
 			// try XDP/eBPF
 			off, err = offload.NewXdpEngine(opt.Interfaces, opt.Log, false)
-		case "dummy":
+		case "null":
 			// no offload
-			off, err = offload.NewDummyEngine(opt.Log)
+			off, err = offload.NewNullEngine(opt.Log)
 		default:
 			opt.Log.Error("unsupported mechanism")
 			//nolint:goerr113
@@ -67,7 +67,7 @@ func newEngine(opt OffloadOptions) (offload.OffloadEngine, error) {
 	}
 	// fallback to no offload
 	if err != nil {
-		return offload.NewDummyEngine(opt.Log)
+		return offload.NewNullEngine(opt.Log)
 	}
 	return off, err
 }

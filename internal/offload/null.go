@@ -4,29 +4,29 @@ import (
 	"github.com/pion/logging"
 )
 
-// DummyEngine is a dummy offload engine
-type DummyEngine struct {
+// NullEngine is a null offload engine
+type NullEngine struct {
 	log logging.LeveledLogger
 }
 
-// NewDummyEngine creates an uninitialized dummy offload engine
-func NewDummyEngine(log logging.LeveledLogger) (*DummyEngine, error) {
-	return &DummyEngine{log: log}, nil
+// NewNullEngine creates an uninitialized null offload engine
+func NewNullEngine(log logging.LeveledLogger) (*NullEngine, error) {
+	return &NullEngine{log: log}, nil
 }
 
 // Logger returns the offload engine's logger
-func (o *DummyEngine) Logger() logging.LeveledLogger {
+func (o *NullEngine) Logger() logging.LeveledLogger {
 	return o.log
 }
 
-// Init initializes the Dummy engine
-func (o *DummyEngine) Init() error {
+// Init initializes the Null engine
+func (o *NullEngine) Init() error {
 	o.log.Info("Init done")
 	return nil
 }
 
-// Shutdown stops the dummy offloading engine
-func (o *DummyEngine) Shutdown() {
+// Shutdown stops the null offloading engine
+func (o *NullEngine) Shutdown() {
 	if o.log == nil {
 		return
 	}
@@ -34,13 +34,13 @@ func (o *DummyEngine) Shutdown() {
 }
 
 // Upsert imitates an offload creation between a client and a peer
-func (o *DummyEngine) Upsert(client, peer Connection, _ []string) error {
+func (o *NullEngine) Upsert(client, peer Connection, _ []string) error {
 	o.log.Debugf("Would create offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
 
 // Remove imitates offload deletion between a client and a peer
-func (o *DummyEngine) Remove(client, peer Connection) error {
+func (o *NullEngine) Remove(client, peer Connection) error {
 	o.log.Debugf("Would remove offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
