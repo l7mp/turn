@@ -14,7 +14,7 @@ import (
 // XdpEngine represents an XDP offload engine; implements OffloadEngine
 type XdpEngine struct {
 	SetupDone     bool
-	Interfaces    []net.Interface
+	interfaces    []net.Interface
 	upstreamMap   *ebpf.Map
 	downstreamMap *ebpf.Map
 	statsMap      *ebpf.Map
@@ -27,7 +27,7 @@ type XdpEngine struct {
 func NewXdpEngine(ifs []net.Interface, log logging.LeveledLogger, setup bool) (*XdpEngine, error) {
 	return &XdpEngine{
 		SetupDone:  setup,
-		Interfaces: ifs,
+		interfaces: ifs,
 		log:        log,
 	}, nil
 }
@@ -102,7 +102,7 @@ func (o *XdpEngine) Init() error {
 
 	ifNames := []string{}
 	// Attach program to interfaces
-	for _, iface := range o.Interfaces {
+	for _, iface := range o.interfaces {
 		l, err := link.AttachXDP(link.XDPOptions{
 			Program:   o.objs.XdpProgFunc,
 			Interface: iface.Index,
