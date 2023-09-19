@@ -15,6 +15,12 @@ import (
 //nolint:gochecknoglobals
 var Engine OffloadEngine
 
+// Init Engine as NullOffload
+func init() {
+	log := logging.NewDefaultLoggerFactory().NewLogger("offload")
+	Engine, _ = NewNullEngine(log)
+}
+
 // OffloadEngine provides a general interface for offloading techniques (e.g., XDP)
 //
 //nolint:revive

@@ -123,22 +123,20 @@ func (a *Allocation) AddChannelBind(c *ChannelBind, lifetime time.Duration) erro
 		c.start(lifetime)
 
 		// enable offload
-		if offload.Engine != nil {
-			// currently we support offload for UDP connections only
-			peer, peerOk := c.Peer.(*net.UDPAddr)
-			relay, relayOk := a.RelayAddr.(*net.UDPAddr)
-			src, srcOk := a.fiveTuple.SrcAddr.(*net.UDPAddr)
-			dst, dstOk := a.fiveTuple.DstAddr.(*net.UDPAddr)
-			if peerOk && relayOk && srcOk && dstOk {
-				peer := offload.NewConnection(peer, relay, 0)
-				client := offload.NewConnection(src, dst, uint32(c.Number))
-				err := offload.Engine.Upsert(client, peer, []string{})
-				if err != nil {
-					offload.Engine.Logger().Errorf("Failed to init offload between client: %+v and peer: %+v due to: %s", client, peer, err)
-				}
-			} else {
-				offload.Engine.Logger().Infof("Offload between non-UDP connections is not supported")
+		// currently we support offload for UDP connections only
+		peer, peerOk := c.Peer.(*net.UDPAddr)
+		relay, relayOk := a.RelayAddr.(*net.UDPAddr)
+		src, srcOk := a.fiveTuple.SrcAddr.(*net.UDPAddr)
+		dst, dstOk := a.fiveTuple.DstAddr.(*net.UDPAddr)
+		if peerOk && relayOk && srcOk && dstOk {
+			peer := offload.NewConnection(peer, relay, 0)
+			client := offload.NewConnection(src, dst, uint32(c.Number))
+			err := offload.Engine.Upsert(client, peer, []string{})
+			if err != nil {
+				offload.Engine.Logger().Errorf("Failed to init offload between client: %+v and peer: %+v due to: %s", client, peer, err)
 			}
+		} else {
+			offload.Engine.Logger().Infof("Offload between non-UDP connections is not supported")
 		}
 
 		// Channel binds also refresh permissions.
@@ -171,16 +169,14 @@ func (a *Allocation) RemoveChannelBind(number proto.ChannelNumber) bool {
 	}
 
 	// disable offload
-	if offload.Engine != nil {
-		c, cOk := cAddr.(*net.UDPAddr)
-		r, rOk := a.RelayAddr.(*net.UDPAddr)
-		if cOk && rOk {
-			peer := offload.NewConnection(c, r, uint32(number))
-			client := offload.NewConnection(r, c, 0)
-			err := offload.Engine.Remove(client, peer)
-			if err == nil {
-				ret = true
-			}
+	c, cOk := cAddr.(*net.UDPAddr)
+	r, rOk := a.RelayAddr.(*net.UDPAddr)
+	if cOk && rOk {
+		peer := offload.NewConnection(c, r, uint32(number))
+		client := offload.NewConnection(r, c, 0)
+		err := offload.Engine.Remove(client, peer)
+		if err == nil {
+			ret = true
 		}
 	}
 
