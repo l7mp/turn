@@ -131,7 +131,7 @@ func (a *Allocation) AddChannelBind(c *ChannelBind, lifetime time.Duration) erro
 		if peerOk && relayOk && srcOk && dstOk {
 			peer := offload.NewConnection(peer, relay, 0)
 			client := offload.NewConnection(src, dst, uint32(c.Number))
-			err := offload.Engine.Upsert(client, peer, []string{})
+			err := offload.Engine.Upsert(client, peer)
 			if err != nil {
 				offload.Engine.Logger().Errorf("Failed to init offload between client: %+v and peer: %+v due to: %s", client, peer, err)
 			}

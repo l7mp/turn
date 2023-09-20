@@ -152,7 +152,7 @@ func (o *XdpEngine) Shutdown() {
 }
 
 // Upsert creates a new XDP offload between a client and a peer
-func (o *XdpEngine) Upsert(client, peer Connection, _ []string) error {
+func (o *XdpEngine) Upsert(client, peer Connection) error {
 	p := xdp.BpfFourTuple{
 		RemoteIp:   HostToNetLong(peer.RemoteIP),
 		LocalIp:    HostToNetLong(peer.LocalIP),
@@ -213,21 +213,22 @@ func (o *XdpEngine) Remove(client, peer Connection) error {
 }
 
 // GetStat queries statistics about an offloaded connection
-func (o *XdpEngine) GetStat(con Connection) error {
+func (o *XdpEngine) GetStat(con Connection) (*Stat, error) {
 	c := xdp.BpfFourTuple{
 		RemoteIp:   HostToNetLong(con.RemoteIP),
 		LocalIp:    HostToNetLong(con.LocalIP),
 		LocalPort:  HostToNetShort(con.LocalPort),
 		RemotePort: HostToNetShort(con.RemotePort),
 	}
-
-	s := xdp.BpfFourTupleStat{}
-	var err error
-	if err = o.statsMap.Lookup(c, &s); err != nil {
-		o.log.Errorf("Get stats error: %s", err)
-		s = xdp.BpfFourTupleStat{Pkts: 0, Bytes: 0, TimestampLast: 0}
+	bs := xdp.BpfFourTupleStat{}
+	if err := o.statsMap.Lookup(c, &bs); err != nil {
+		return nil, err
 	}
-	o.log.Infof("%+v stats: %+v", c, s)
 
-	return err
+	s := Stat{}
+	s.Pkts = bs.Pkts
+	s.Bytes = bs.Bytes
+	s.TimeStamp = bs.TimestampLast
+
+	return &s, nil
 }

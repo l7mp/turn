@@ -28,11 +28,12 @@ type OffloadEngine interface {
 	Logger() logging.LeveledLogger
 	Init() error
 	Shutdown()
-	Upsert(client, peer Connection, metrics []string) error
+	Upsert(client, peer Connection) error
 	Remove(client, peer Connection) error
+	GetStat(con Connection) (*Stat, error)
 }
 
-// Connection combines offload engine identifiers required for uinquely identifying Allocation channel bindings. Depending of the used offload engine, values might be nulled. For example, the SockFd has no role for an XDP offload.
+// Connection combines offload engine identifiers required for uinquely identifying Allocation channel bindings. Depending of the used offload engine, values might be nulled. For example, the SockFd has no role for an XDP offload
 type Connection struct {
 	RemoteIP   uint32
 	LocalIP    uint32
@@ -41,6 +42,13 @@ type Connection struct {
 	Protocol   uint32
 	SocketFd   uintptr
 	ChannelID  uint32
+}
+
+// Stat holds offload engine-related traffic statistics
+type Stat struct {
+	Pkts      uint64
+	Bytes     uint64
+	TimeStamp uint64
 }
 
 // NewConnection is the internal representation of a five-tuple with a channel ID

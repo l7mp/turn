@@ -34,7 +34,7 @@ func (o *NullEngine) Shutdown() {
 }
 
 // Upsert imitates an offload creation between a client and a peer
-func (o *NullEngine) Upsert(client, peer Connection, _ []string) error {
+func (o *NullEngine) Upsert(client, peer Connection) error {
 	o.log.Debugf("Would create offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
@@ -43,4 +43,10 @@ func (o *NullEngine) Upsert(client, peer Connection, _ []string) error {
 func (o *NullEngine) Remove(client, peer Connection) error {
 	o.log.Debugf("Would remove offload between client: %+v and peer: %+v", client, peer)
 	return nil
+}
+
+// Get offload statistics
+func (o *NullEngine) GetStat(con Connection) (*Stat, error) {
+	s := Stat{}
+	return &s, nil
 }
