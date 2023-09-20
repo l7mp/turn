@@ -45,8 +45,8 @@ func (o *NullEngine) Remove(client, peer Connection) error {
 	return nil
 }
 
-// Get offload statistics
-func (o *NullEngine) GetStat(con Connection) (*Stat, error) {
+// GetStat returns null offload statistics
+func (o *NullEngine) GetStat(_ Connection) (*Stat, error) {
 	s := Stat{}
 	return &s, nil
 }
