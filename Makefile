@@ -17,8 +17,6 @@ clean-offload:
 	rm -vf internal/offload/xdp/bpf_bpfe*.o
 	rm -vf internal/offload/xdp/bpf_bpfe*.go
 
-purge-offload: clean
-
 test:
 	go test -v
 
