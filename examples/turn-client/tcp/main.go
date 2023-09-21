@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/turn/v2"
+	"github.com/pion/turn/v3"
 )
 
 func main() {
@@ -33,13 +33,8 @@ func main() {
 	}
 
 	// Dial TURN Server
-	hostPort := fmt.Sprintf("%s:%d", *host, *port)
-	turnServerAddr, err := net.ResolveTCPAddr("tcp", hostPort)
-	if err != nil {
-		log.Fatalf("Failed to resolve %s: %s", hostPort, err)
-	}
-
-	conn, err := net.DialTCP("tcp", nil, turnServerAddr)
+	turnServerAddr := fmt.Sprintf("%s:%d", *host, *port)
+	conn, err := net.Dial("tcp", turnServerAddr)
 	if err != nil {
 		log.Panicf("Failed to connect to TURN server: %s", err)
 	}

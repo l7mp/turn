@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/turn/v2/internal/allocation"
-	"github.com/pion/turn/v2/internal/proto"
-	"github.com/pion/turn/v2/internal/server"
+	"github.com/pion/turn/v3/internal/allocation"
+	"github.com/pion/turn/v3/internal/proto"
+	"github.com/pion/turn/v3/internal/server"
 )
 
 const (
@@ -150,7 +150,7 @@ func (s *Server) readListener(l net.Listener, am *allocation.Manager) {
 			s.readLoop(NewSTUNConn(conn), am)
 
 			if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-				s.log.Errorf("failed to close conn: %s", err)
+				s.log.Errorf("Failed to close conn: %s", err)
 			}
 		}()
 	}
@@ -182,10 +182,11 @@ func (s *Server) readLoop(p net.PacketConn, allocationManager *allocation.Manage
 		n, addr, err := p.ReadFrom(buf)
 		switch {
 		case err != nil:
-			s.log.Debugf("exit read loop on error: %s", err.Error())
+			s.log.Debugf("Exit read loop on error: %s", err)
 			return
 		case n >= s.inboundMTU:
 			s.log.Debugf("Read bytes exceeded MTU, packet is possibly truncated")
+			continue
 		}
 
 		if err := server.HandleRequest(server.Request{
@@ -199,7 +200,7 @@ func (s *Server) readLoop(p net.PacketConn, allocationManager *allocation.Manage
 			ChannelBindTimeout: s.channelBindTimeout,
 			Nonces:             s.nonces,
 		}); err != nil {
-			s.log.Errorf("error when handling datagram: %v", err)
+			s.log.Errorf("Failed to handle datagram: %v", err)
 		}
 	}
 }

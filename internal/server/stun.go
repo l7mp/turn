@@ -4,12 +4,12 @@
 package server
 
 import (
-	"github.com/pion/stun"
-	"github.com/pion/turn/v2/internal/ipnet"
+	"github.com/pion/stun/v2"
+	"github.com/pion/turn/v3/internal/ipnet"
 )
 
 func handleBindingRequest(r Request, m *stun.Message) error {
-	r.Log.Debugf("received BindingRequest from %s", r.SrcAddr.String())
+	r.Log.Debugf("Received BindingRequest from %s", r.SrcAddr.String())
 
 	ip, port, err := ipnet.AddrIPPort(r.SrcAddr)
 	if err != nil {

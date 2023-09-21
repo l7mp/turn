@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"github.com/pion/logging"
-	"github.com/pion/turn/v2/internal/offload"
+	"github.com/pion/turn/v3/internal/offload"
 )
 
 // OffloadOptions defines various offload options

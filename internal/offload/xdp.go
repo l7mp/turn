@@ -8,7 +8,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/pion/logging"
-	"github.com/pion/turn/v2/internal/offload/xdp"
+	"github.com/pion/turn/v3/internal/offload/xdp"
 )
 
 // XdpEngine represents an XDP offload engine; implements OffloadEngine

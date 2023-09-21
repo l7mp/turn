@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/stun"
-	"github.com/pion/turn/v2/internal/ipnet"
-	"github.com/pion/turn/v2/internal/offload"
-	"github.com/pion/turn/v2/internal/proto"
+	"github.com/pion/stun/v2"
+	"github.com/pion/turn/v3/internal/ipnet"
+	"github.com/pion/turn/v3/internal/offload"
+	"github.com/pion/turn/v3/internal/proto"
 )
 
 type allocationResponse struct {
@@ -45,16 +45,6 @@ type Allocation struct {
 	responseCache atomic.Value // *allocationResponse
 }
 
-func addr2IPFingerprint(addr net.Addr) string {
-	switch a := addr.(type) {
-	case *net.UDPAddr:
-		return a.IP.String()
-	case *net.TCPAddr: // Do we really need this case?
-		return a.IP.String()
-	}
-	return "" // Should never happen
-}
-
 // NewAllocation creates a new instance of NewAllocation.
 func NewAllocation(turnSocket net.PacketConn, fiveTuple *FiveTuple, log logging.LeveledLogger) *Allocation {
 	return &Allocation{
@@ -71,12 +61,12 @@ func (a *Allocation) GetPermission(addr net.Addr) *Permission {
 	a.permissionsLock.RLock()
 	defer a.permissionsLock.RUnlock()
 
-	return a.permissions[addr2IPFingerprint(addr)]
+	return a.permissions[ipnet.FingerprintAddr(addr)]
 }
 
 // AddPermission adds a new permission to the allocation
 func (a *Allocation) AddPermission(p *Permission) {
-	fingerprint := addr2IPFingerprint(p.Addr)
+	fingerprint := ipnet.FingerprintAddr(p.Addr)
 
 	a.permissionsLock.RLock()
 	existedPermission, ok := a.permissions[fingerprint]
@@ -99,7 +89,7 @@ func (a *Allocation) AddPermission(p *Permission) {
 func (a *Allocation) RemovePermission(addr net.Addr) {
 	a.permissionsLock.Lock()
 	defer a.permissionsLock.Unlock()
-	delete(a.permissions, addr2IPFingerprint(addr))
+	delete(a.permissions, ipnet.FingerprintAddr(addr))
 }
 
 // AddChannelBind adds a new ChannelBind to the allocation, it also updates the
@@ -288,7 +278,7 @@ func (a *Allocation) packetHandler(m *Manager) {
 			return
 		}
 
-		a.log.Debugf("relay socket %s received %d bytes from %s",
+		a.log.Debugf("Relay socket %s received %d bytes from %s",
 			a.RelaySocket.LocalAddr().String(),
 			n,
 			srcAddr.String())
@@ -318,7 +308,7 @@ func (a *Allocation) packetHandler(m *Manager) {
 				a.log.Errorf("Failed to send DataIndication from allocation %v %v", srcAddr, err)
 				return
 			}
-			a.log.Debugf("relaying message from %s to client at %s",
+			a.log.Debugf("Relaying message from %s to client at %s",
 				srcAddr.String(),
 				a.fiveTuple.SrcAddr.String())
 			if _, err = a.TurnSocket.WriteTo(msg.Raw, a.fiveTuple.SrcAddr); err != nil {
