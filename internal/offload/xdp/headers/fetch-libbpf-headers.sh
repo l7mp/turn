@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+# SPDX-License-Identifier: MIT
+
 # Version of libbpf to fetch headers from
 LIBBPF_VERSION=1.2.2
 

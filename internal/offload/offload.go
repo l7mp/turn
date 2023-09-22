@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // Package offload implements a kernel-offload engine to speed up transporting ChannelData messages
 //
 //nolint:gochecknoinits

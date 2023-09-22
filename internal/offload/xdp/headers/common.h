@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 // This is a compact version of `vmlinux.h` to be used in the examples using C code.
 
 #pragma once

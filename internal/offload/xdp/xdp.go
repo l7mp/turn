@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cflags "-Wall -O2" bpf xdp.c -- -I./headers
 
 // Package xdp package implements the XDP offload.

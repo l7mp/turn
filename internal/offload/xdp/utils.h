@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
 // +build ignore
 
 #ifndef __XDP_TURN_OFFLOAD_UTILS__
