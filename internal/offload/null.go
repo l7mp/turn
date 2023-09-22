@@ -14,11 +14,6 @@ func NewNullEngine(log logging.LeveledLogger) (*NullEngine, error) {
 	return &NullEngine{log: log}, nil
 }
 
-// Logger returns the offload engine's logger
-func (o *NullEngine) Logger() logging.LeveledLogger {
-	return o.log
-}
-
 // Init initializes the Null engine
 func (o *NullEngine) Init() error {
 	o.log.Info("Init done")

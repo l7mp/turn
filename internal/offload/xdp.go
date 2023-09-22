@@ -53,11 +53,6 @@ func (o *XdpEngine) unpinMaps() error {
 	return nil
 }
 
-// Logger returns the offload engine's logger
-func (o *XdpEngine) Logger() logging.LeveledLogger {
-	return o.log
-}
-
 // Init sets up the environment for the XDP program: enables IPv4
 // forwarding in the kernel; links maps of the XDP program; and,
 // starts the XDP program on network interfaces.
@@ -178,7 +173,7 @@ func (o *XdpEngine) Upsert(client, peer Connection) error {
 		return err
 	}
 
-	o.log.Debugf("Create offload between client: %+v and peer: %+v", client, peer)
+	o.log.Infof("Create offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
 
@@ -208,7 +203,7 @@ func (o *XdpEngine) Remove(client, peer Connection) error {
 		return err
 	}
 
-	o.log.Debugf("Remove offload between client: %+v and peer: %+v", client, peer)
+	o.log.Infof("Remove offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
 

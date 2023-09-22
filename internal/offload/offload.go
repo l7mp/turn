@@ -25,7 +25,6 @@ func init() {
 //
 //nolint:revive
 type OffloadEngine interface {
-	Logger() logging.LeveledLogger
 	Init() error
 	Shutdown()
 	Upsert(client, peer Connection) error
