@@ -8,8 +8,8 @@ import (
 	"github.com/pion/turn/v3/internal/offload"
 )
 
-// OffloadOptions defines various offload options
-type OffloadOptions struct {
+// OffloadConfig defines various offload options
+type OffloadConfig struct {
 	// Logger is a leveled logger
 	Log logging.LeveledLogger
 	// Mechanisms are the offload mechanisms to be used. First element has the highest priority.
@@ -22,7 +22,7 @@ type OffloadOptions struct {
 }
 
 // InitOffload initializes offloading engine (e.g., eBPF kernel offload engine) to speed up networking
-func InitOffload(o OffloadOptions) error {
+func InitOffload(o OffloadConfig) error {
 	var err error
 	offload.Engine, err = newEngine(o)
 	if err != nil {
@@ -33,7 +33,7 @@ func InitOffload(o OffloadOptions) error {
 }
 
 // newEngine instantiates a new offload engine. It probes strategies until a fitting one is ousable one is found
-func newEngine(opt OffloadOptions) (offload.OffloadEngine, error) {
+func newEngine(opt OffloadConfig) (offload.OffloadEngine, error) {
 	// set defaults
 	if len(opt.Mechanisms) == 0 {
 		opt.Mechanisms = []string{"xdp", "null"}

@@ -45,7 +45,7 @@ func main() {
 
 	// Init the XDP offload engine
 	loggerFactory := logging.NewDefaultLoggerFactory()
-	err = turn.InitOffload(turn.OffloadOptions{Log: loggerFactory.NewLogger("offload")})
+	err = turn.InitOffload(turn.OffloadConfig{Log: loggerFactory.NewLogger("offload")})
 	if err != nil {
 		log.Fatalf("Failed to init offload engine: %s", err)
 	}
