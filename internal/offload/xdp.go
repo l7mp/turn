@@ -4,6 +4,7 @@
 package offload
 
 import (
+	"encoding/binary"
 	"net"
 	"os"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/pion/logging"
 	"github.com/pion/turn/v3/internal/offload/xdp"
+	"github.com/pion/turn/v3/internal/proto"
 )
 
 // XdpEngine represents an XDP offload engine; implements OffloadEngine
@@ -151,19 +153,16 @@ func (o *XdpEngine) Shutdown() {
 
 // Upsert creates a new XDP offload between a client and a peer
 func (o *XdpEngine) Upsert(client, peer Connection) error {
-	p := xdp.BpfFourTuple{
-		RemoteIp:   HostToNetLong(peer.RemoteIP),
-		LocalIp:    HostToNetLong(peer.LocalIP),
-		LocalPort:  HostToNetShort(peer.LocalPort),
-		RemotePort: HostToNetShort(peer.RemotePort),
+	p, err := bpfFourTuple(peer)
+	if err != nil {
+		return err
+	}
+	cft, err := bpfFourTuple(client)
+	if err != nil {
+		return err
 	}
 	c := xdp.BpfFourTupleWithChannelId{
-		FourTuple: xdp.BpfFourTuple{
-			RemoteIp:   HostToNetLong(client.RemoteIP),
-			LocalIp:    HostToNetLong(client.LocalIP),
-			LocalPort:  HostToNetShort(client.LocalPort),
-			RemotePort: HostToNetShort(client.RemotePort),
-		},
+		FourTuple: *cft,
 		ChannelId: client.ChannelID,
 	}
 
@@ -182,19 +181,16 @@ func (o *XdpEngine) Upsert(client, peer Connection) error {
 
 // Remove removes an XDP offload between a client and a peer
 func (o *XdpEngine) Remove(client, peer Connection) error {
-	p := xdp.BpfFourTuple{
-		RemoteIp:   HostToNetLong(peer.RemoteIP),
-		LocalIp:    HostToNetLong(peer.LocalIP),
-		LocalPort:  HostToNetShort(peer.LocalPort),
-		RemotePort: HostToNetShort(peer.RemotePort),
+	p, err := bpfFourTuple(peer)
+	if err != nil {
+		return err
+	}
+	cft, err := bpfFourTuple(client)
+	if err != nil {
+		return err
 	}
 	c := xdp.BpfFourTupleWithChannelId{
-		FourTuple: xdp.BpfFourTuple{
-			RemoteIp:   HostToNetLong(client.RemoteIP),
-			LocalIp:    HostToNetLong(client.LocalIP),
-			LocalPort:  HostToNetShort(client.LocalPort),
-			RemotePort: HostToNetShort(client.RemotePort),
-		},
+		FourTuple: *cft,
 		ChannelId: client.ChannelID,
 	}
 
@@ -212,11 +208,9 @@ func (o *XdpEngine) Remove(client, peer Connection) error {
 
 // GetStat queries statistics about an offloaded connection
 func (o *XdpEngine) GetStat(con Connection) (*Stat, error) {
-	c := xdp.BpfFourTuple{
-		RemoteIp:   HostToNetLong(con.RemoteIP),
-		LocalIp:    HostToNetLong(con.LocalIP),
-		LocalPort:  HostToNetShort(con.LocalPort),
-		RemotePort: HostToNetShort(con.RemotePort),
+	c, err := bpfFourTuple(con)
+	if err != nil {
+		return nil, err
 	}
 	bs := xdp.BpfFourTupleStat{}
 	if err := o.statsMap.Lookup(c, &bs); err != nil {
@@ -229,4 +223,38 @@ func (o *XdpEngine) GetStat(con Connection) (*Stat, error) {
 	s.TimeStamp = bs.TimestampLast
 
 	return &s, nil
+}
+
+func hostToNetShort(i uint16) uint16 {
+	b := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b, i)
+	return binary.BigEndian.Uint16(b)
+}
+
+// bpfFourTuple creates an xdp.BpfFourTuple struct that can be used in the XDP offload maps
+func bpfFourTuple(c Connection) (*xdp.BpfFourTuple, error) {
+	if c.Protocol != proto.ProtoUDP {
+		return nil, errUnsupportedProtocol
+	}
+	l, lok := c.LocalAddr.(*net.UDPAddr)
+	r, rok := c.RemoteAddr.(*net.UDPAddr)
+	if !lok || !rok {
+		return nil, errUnsupportedProtocol
+	}
+	var localIP uint32
+	if l.IP.To4() != nil {
+		localIP = binary.LittleEndian.Uint32(l.IP.To4())
+	}
+	var remoteIP uint32
+	if r.IP.To4() != nil {
+		remoteIP = binary.LittleEndian.Uint32(r.IP.To4())
+	}
+
+	t := xdp.BpfFourTuple{
+		RemoteIp:   remoteIP,
+		LocalIp:    localIP,
+		RemotePort: hostToNetShort(uint16(r.Port)),
+		LocalPort:  hostToNetShort(uint16(l.Port)),
+	}
+	return &t, nil
 }

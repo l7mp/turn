@@ -7,10 +7,10 @@
 package offload
 
 import (
-	"encoding/binary"
 	"net"
 
 	"github.com/pion/logging"
+	"github.com/pion/turn/v3/internal/proto"
 )
 
 // Engine represents the network offloading engine
@@ -35,13 +35,11 @@ type OffloadEngine interface {
 	GetStat(con Connection) (*Stat, error)
 }
 
-// Connection combines offload engine identifiers required for uinquely identifying Allocation channel bindings. Depending of the used offload engine, values might be nulled. For example, the SockFd has no role for an XDP offload
+// Connection combines offload engine identifiers required for uinquely identifying allocation channel bindings. Depending of the used offload engine, some values are not required. For example, the SockFd has no role for an XDP offload
 type Connection struct {
-	RemoteIP   uint32
-	LocalIP    uint32
-	RemotePort uint16
-	LocalPort  uint16
-	Protocol   uint32
+	RemoteAddr net.Addr
+	LocalAddr  net.Addr
+	Protocol   proto.Protocol
 	SocketFd   uintptr
 	ChannelID  uint32
 }
@@ -51,24 +49,4 @@ type Stat struct {
 	Pkts      uint64
 	Bytes     uint64
 	TimeStamp uint64
-}
-
-// NewConnection is the internal representation of a five-tuple with a channel ID
-func NewConnection(remote, local *net.UDPAddr, channel uint32) Connection {
-	var localIP uint32
-	if local.IP.To4() != nil {
-		localIP = binary.BigEndian.Uint32(local.IP.To4())
-	}
-	var remoteIP uint32
-	if remote.IP.To4() != nil {
-		remoteIP = binary.BigEndian.Uint32(remote.IP.To4())
-	}
-	return Connection{
-		LocalIP:    localIP,
-		RemoteIP:   remoteIP,
-		LocalPort:  uint16(local.Port),
-		RemotePort: uint16(remote.Port),
-		Protocol:   17,
-		ChannelID:  channel,
-	}
 }

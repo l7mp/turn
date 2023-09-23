@@ -114,15 +114,18 @@ func (a *Allocation) AddChannelBind(c *ChannelBind, lifetime time.Duration) erro
 
 		// enable offload
 		// currently we support offload for UDP connections only
-		peer, peerOk := c.Peer.(*net.UDPAddr)
-		relay, relayOk := a.RelayAddr.(*net.UDPAddr)
-		src, srcOk := a.fiveTuple.SrcAddr.(*net.UDPAddr)
-		dst, dstOk := a.fiveTuple.DstAddr.(*net.UDPAddr)
-		if peerOk && relayOk && srcOk && dstOk {
-			peer := offload.NewConnection(peer, relay, 0)
-			client := offload.NewConnection(src, dst, uint32(c.Number))
-			_ = offload.Engine.Upsert(client, peer)
+		peer := offload.Connection{
+			RemoteAddr: c.Peer,
+			LocalAddr:  a.RelayAddr,
+			Protocol:   proto.ProtoUDP,
 		}
+		client := offload.Connection{
+			RemoteAddr: a.fiveTuple.SrcAddr,
+			LocalAddr:  a.fiveTuple.DstAddr,
+			Protocol:   proto.ProtoUDP,
+			ChannelID:  uint32(c.Number),
+		}
+		_ = offload.Engine.Upsert(client, peer)
 
 		// Channel binds also refresh permissions.
 		a.AddPermission(NewPermission(c.Peer, a.log))
@@ -154,16 +157,18 @@ func (a *Allocation) RemoveChannelBind(number proto.ChannelNumber) bool {
 	}
 
 	// disable offload
-	c, cOk := cAddr.(*net.UDPAddr)
-	r, rOk := a.RelayAddr.(*net.UDPAddr)
-	if cOk && rOk {
-		peer := offload.NewConnection(c, r, uint32(number))
-		client := offload.NewConnection(r, c, 0)
-		err := offload.Engine.Remove(client, peer)
-		if err == nil {
-			ret = true
-		}
+	peer := offload.Connection{
+		RemoteAddr: cAddr,
+		LocalAddr:  a.RelayAddr,
+		Protocol:   proto.ProtoUDP,
+		ChannelID:  uint32(number),
 	}
+	client := offload.Connection{
+		RemoteAddr: a.RelayAddr,
+		LocalAddr:  cAddr,
+		Protocol:   proto.ProtoUDP,
+	}
+	_ = offload.Engine.Remove(client, peer)
 
 	return ret
 }
