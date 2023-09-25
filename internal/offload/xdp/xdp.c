@@ -277,10 +277,6 @@ int xdp_prog_func(struct xdp_md *ctx)
 		if (r != 0)
 			goto out;
 		udp_len -= 4;
-		data_end = (void *)(long)ctx->data_end;
-		data = (void *)(long)ctx->data;
-		udp_payload =
-			data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr);
 	}
 
 	// update fields and send packet
