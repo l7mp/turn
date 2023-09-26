@@ -22,6 +22,7 @@ type XdpEngine struct {
 	interfaces    []net.Interface
 	upstreamMap   *ebpf.Map
 	downstreamMap *ebpf.Map
+	ipaddrsMap    *ebpf.Map
 	statsMap      *ebpf.Map
 	objs          xdp.BpfObjects
 	links         []link.Link
@@ -51,6 +52,12 @@ func (o *XdpEngine) unpinMaps() error {
 	}
 	if o.statsMap != nil {
 		if err := o.statsMap.Unpin(); err != nil {
+			return err
+		}
+	}
+
+	if o.ipaddrsMap != nil {
+		if err := o.ipaddrsMap.Unpin(); err != nil {
 			return err
 		}
 	}
@@ -93,25 +100,46 @@ func (o *XdpEngine) Init() error {
 	o.objs = xdp.BpfObjects{}
 	bpfMapPinPath := "/sys/fs/bpf"
 	opts := ebpf.CollectionOptions{Maps: ebpf.MapOptions{PinPath: bpfMapPinPath}}
-	if err := xdp.LoadBpfObjects(&o.objs, &opts); err != nil {
+	if err = xdp.LoadBpfObjects(&o.objs, &opts); err != nil {
 		return err
 	}
 	o.downstreamMap = o.objs.TurnServerDownstreamMap
 	o.upstreamMap = o.objs.TurnServerUpstreamMap
+	o.ipaddrsMap = o.objs.TurnServerInterfaceIpAddressesMap
 	o.statsMap = o.objs.TurnServerStatsMap
 
 	ifNames := []string{}
 	// Attach program to interfaces
 	for _, iface := range o.interfaces {
-		l, err := link.AttachXDP(link.XDPOptions{
+		l, linkErr := link.AttachXDP(link.XDPOptions{
 			Program:   o.objs.XdpProgFunc,
 			Interface: iface.Index,
 		})
-		if err != nil {
-			return err
+		if linkErr != nil {
+			return linkErr
 		}
 		o.links = append(o.links, l)
 		ifNames = append(ifNames, iface.Name)
+	}
+
+	// populate interface IP addresses map
+	ifs, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+	for _, netIf := range ifs {
+		ifIdx := netIf.Index
+		addrs, err := netIf.Addrs()
+		if err == nil && len(addrs) > 0 {
+			a, ok := addrs[0].(*net.IPNet)
+			if addr := a.IP.To4(); addr != nil && ok {
+				ifAddr := binary.LittleEndian.Uint32(addr)
+				err := o.ipaddrsMap.Put(uint32(ifIdx), ifAddr)
+				if err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	o.SetupDone = true

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
-// Package main implements a TURN server with XDP offload
+// Package main implements a simple TURN server with XDP offload
 package main
 
 import (
@@ -34,7 +34,7 @@ func main() {
 	// Create a UDP listener to pass into pion/turn
 	// pion/turn itself doesn't allocate any UDP sockets, but lets the user pass them in
 	// this allows us to add logging, storage or modify inbound/outbound traffic
-	udpListener, err := net.ListenPacket("udp4", *publicIP+":"+strconv.Itoa(*port))
+	udpListener, err := net.ListenPacket("udp4", "0.0.0.0:"+strconv.Itoa(*port))
 	if err != nil {
 		log.Panicf("Failed to create TURN server listener: %s", err)
 	}
@@ -71,7 +71,7 @@ func main() {
 				PacketConn: udpListener,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP(*publicIP), // Claim that we are listening on IP passed by user (This should be your Public IP)
-					Address:      *publicIP,
+					Address:      "0.0.0.0",              // But actually be listening on every interface
 				},
 			},
 		},

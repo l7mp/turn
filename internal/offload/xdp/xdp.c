@@ -87,6 +87,15 @@ struct {
 	__type(value, struct FourTupleStat);
 } turn_server_stats_map SEC(".maps");
 
+// interface IP addresses
+struct {
+	__uint(type, BPF_MAP_TYPE_LRU_HASH);
+	__uint(max_entries, MAX_MAP_ENTRIES);
+	__uint(pinning, LIBBPF_PIN_BY_NAME);
+	__type(key, __u32);
+	__type(value, __be32);
+} turn_server_interface_ip_addresses_map SEC(".maps");
+
 SEC("xdp")
 int xdp_prog_func(struct xdp_md *ctx)
 {
@@ -348,15 +357,34 @@ int xdp_prog_func(struct xdp_md *ctx)
 	rc = bpf_fib_lookup(ctx, &fib_params, sizeof(fib_params), 0);
 	switch (rc) {
 	case BPF_FIB_LKUP_RET_SUCCESS: /* lookup successful */
+		// set eth addr
 		memcpy(eth->h_dest, fib_params.dmac, ETH_ALEN);
 		memcpy(eth->h_source, fib_params.smac, ETH_ALEN);
+
+		// update ip src addr
+		old_saddr = iphdr->saddr;
+		__be32 *new_saddr;
+		new_saddr = bpf_map_lookup_elem(&turn_server_interface_ip_addresses_map,
+						&fib_params.ifindex);
+		if (!new_saddr) {
+			goto out;
+		}
+		iphdr->saddr = *new_saddr;
+
+		// update ip and udp checksums
+		iphdr->check = update_udp_checksum(iphdr->check, old_saddr, iphdr->saddr);
+		udphdr->check = update_udp_checksum(udphdr->check, old_saddr, iphdr->saddr);
+
+		// redirect packet
 		action = bpf_redirect(fib_params.ifindex, 0);
 		break;
+
 	case BPF_FIB_LKUP_RET_BLACKHOLE:   /* dest is blackholed; can be dropped */
 	case BPF_FIB_LKUP_RET_UNREACHABLE: /* dest is unreachable; can be dropped */
 	case BPF_FIB_LKUP_RET_PROHIBIT:	   /* dest not allowed; can be dropped */
 		action = XDP_DROP;
 		break;
+
 	case BPF_FIB_LKUP_RET_NOT_FWDED:    /* packet is not forwarded */
 	case BPF_FIB_LKUP_RET_FWD_DISABLED: /* fwding is not enabled on ingress */
 	case BPF_FIB_LKUP_RET_UNSUPP_LWT:   /* fwd requires encapsulation */

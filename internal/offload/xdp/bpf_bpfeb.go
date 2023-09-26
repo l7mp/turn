@@ -79,9 +79,10 @@ type bpfProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	TurnServerDownstreamMap *ebpf.MapSpec `ebpf:"turn_server_downstream_map"`
-	TurnServerStatsMap      *ebpf.MapSpec `ebpf:"turn_server_stats_map"`
-	TurnServerUpstreamMap   *ebpf.MapSpec `ebpf:"turn_server_upstream_map"`
+	TurnServerDownstreamMap           *ebpf.MapSpec `ebpf:"turn_server_downstream_map"`
+	TurnServerInterfaceIpAddressesMap *ebpf.MapSpec `ebpf:"turn_server_interface_ip_addresses_map"`
+	TurnServerStatsMap                *ebpf.MapSpec `ebpf:"turn_server_stats_map"`
+	TurnServerUpstreamMap             *ebpf.MapSpec `ebpf:"turn_server_upstream_map"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -103,14 +104,16 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	TurnServerDownstreamMap *ebpf.Map `ebpf:"turn_server_downstream_map"`
-	TurnServerStatsMap      *ebpf.Map `ebpf:"turn_server_stats_map"`
-	TurnServerUpstreamMap   *ebpf.Map `ebpf:"turn_server_upstream_map"`
+	TurnServerDownstreamMap           *ebpf.Map `ebpf:"turn_server_downstream_map"`
+	TurnServerInterfaceIpAddressesMap *ebpf.Map `ebpf:"turn_server_interface_ip_addresses_map"`
+	TurnServerStatsMap                *ebpf.Map `ebpf:"turn_server_stats_map"`
+	TurnServerUpstreamMap             *ebpf.Map `ebpf:"turn_server_upstream_map"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
 		m.TurnServerDownstreamMap,
+		m.TurnServerInterfaceIpAddressesMap,
 		m.TurnServerStatsMap,
 		m.TurnServerUpstreamMap,
 	)
