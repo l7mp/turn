@@ -18,7 +18,6 @@ import (
 
 // XdpEngine represents an XDP offload engine; implements OffloadEngine
 type XdpEngine struct {
-	isInitialized bool
 	interfaces    []net.Interface
 	upstreamMap   *ebpf.Map
 	downstreamMap *ebpf.Map
@@ -31,10 +30,14 @@ type XdpEngine struct {
 
 // NewXdpEngine creates an uninitialized XDP offload engine
 func NewXdpEngine(ifs []net.Interface, log logging.LeveledLogger) (*XdpEngine, error) {
-	return &XdpEngine{
+	if xdp.IsInitialized {
+		return nil, errXDPAlreadyInitialized
+	}
+	e := &XdpEngine{
 		interfaces: ifs,
 		log:        log,
-	}, nil
+	}
+	return e, nil
 }
 
 func (o *XdpEngine) unpinMaps() error {
@@ -69,10 +72,9 @@ func (o *XdpEngine) unpinMaps() error {
 // starts the XDP program on network interfaces.
 // Based on https://github.com/l7mp/l7mp/blob/master/udp-offload.js#L232
 func (o *XdpEngine) Init() error {
-	if o.isInitialized {
-		return nil
+	if xdp.IsInitialized {
+		return errXDPAlreadyInitialized
 	}
-
 	// enable ipv4 forwarding
 	f := "/proc/sys/net/ipv4/conf/all/forwarding"
 	data, err := os.ReadFile(f)
@@ -97,8 +99,7 @@ func (o *XdpEngine) Init() error {
 
 	// Load pre-compiled programs into the kernel
 	o.objs = xdp.BpfObjects{}
-	bpfMapPinPath := "/sys/fs/bpf"
-	opts := ebpf.CollectionOptions{Maps: ebpf.MapOptions{PinPath: bpfMapPinPath}}
+	opts := ebpf.CollectionOptions{Maps: ebpf.MapOptions{PinPath: xdp.BpfMapPinPath}}
 	if err = xdp.LoadBpfObjects(&o.objs, &opts); err != nil {
 		return err
 	}
@@ -141,7 +142,7 @@ func (o *XdpEngine) Init() error {
 		}
 	}
 
-	o.isInitialized = true
+	xdp.IsInitialized = true
 
 	o.log.Infof("Init done on interfaces: %s", ifNames)
 	return nil
@@ -149,7 +150,7 @@ func (o *XdpEngine) Init() error {
 
 // Shutdown stops the XDP offloading engine
 func (o *XdpEngine) Shutdown() {
-	if !o.isInitialized {
+	if !xdp.IsInitialized {
 		return
 	}
 
@@ -173,7 +174,7 @@ func (o *XdpEngine) Shutdown() {
 		return
 	}
 
-	o.isInitialized = false
+	xdp.IsInitialized = false
 
 	o.log.Info("Shutdown done")
 }

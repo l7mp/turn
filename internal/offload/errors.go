@@ -5,4 +5,7 @@ package offload
 
 import "errors"
 
-var errUnsupportedProtocol = errors.New("offload: Protocol not supported")
+var (
+	errUnsupportedProtocol   = errors.New("offload: Protocol not supported")
+	errXDPAlreadyInitialized = errors.New("offload: XDP engine is already initialized")
+)

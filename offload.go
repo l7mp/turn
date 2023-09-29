@@ -55,6 +55,12 @@ func newEngine(opt OffloadConfig) (offload.OffloadEngine, error) {
 		case "xdp":
 			// try XDP/eBPF
 			off, err = offload.NewXdpEngine(opt.Interfaces, opt.Log)
+			// in case it is already running, restart it
+			_, isExist := offload.Engine.(*offload.XdpEngine)
+			if err != nil && isExist {
+				offload.Engine.Shutdown()
+				off, err = offload.NewXdpEngine(opt.Interfaces, opt.Log)
+			}
 		case "null":
 			// no offload
 			off, err = offload.NewNullEngine(opt.Log)

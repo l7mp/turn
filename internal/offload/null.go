@@ -19,7 +19,7 @@ func NewNullEngine(log logging.LeveledLogger) (*NullEngine, error) {
 
 // Init initializes the Null engine
 func (o *NullEngine) Init() error {
-	o.log.Info("Init done")
+	o.log.Info("(NullOffload) Init done")
 	return nil
 }
 
@@ -28,7 +28,7 @@ func (o *NullEngine) Shutdown() {
 	if o.log == nil {
 		return
 	}
-	o.log.Info("Shutdown done")
+	o.log.Info("(NullOffload) Shutdown done")
 }
 
 // Upsert imitates an offload creation between a client and a peer
