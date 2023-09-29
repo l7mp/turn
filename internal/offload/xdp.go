@@ -18,7 +18,7 @@ import (
 
 // XdpEngine represents an XDP offload engine; implements OffloadEngine
 type XdpEngine struct {
-	SetupDone     bool
+	isInitialized bool
 	interfaces    []net.Interface
 	upstreamMap   *ebpf.Map
 	downstreamMap *ebpf.Map
@@ -30,9 +30,8 @@ type XdpEngine struct {
 }
 
 // NewXdpEngine creates an uninitialized XDP offload engine
-func NewXdpEngine(ifs []net.Interface, log logging.LeveledLogger, setup bool) (*XdpEngine, error) {
+func NewXdpEngine(ifs []net.Interface, log logging.LeveledLogger) (*XdpEngine, error) {
 	return &XdpEngine{
-		SetupDone:  setup,
 		interfaces: ifs,
 		log:        log,
 	}, nil
@@ -70,7 +69,7 @@ func (o *XdpEngine) unpinMaps() error {
 // starts the XDP program on network interfaces.
 // Based on https://github.com/l7mp/l7mp/blob/master/udp-offload.js#L232
 func (o *XdpEngine) Init() error {
-	if o.SetupDone {
+	if o.isInitialized {
 		return nil
 	}
 
@@ -142,7 +141,7 @@ func (o *XdpEngine) Init() error {
 		}
 	}
 
-	o.SetupDone = true
+	o.isInitialized = true
 
 	o.log.Infof("Init done on interfaces: %s", ifNames)
 	return nil
@@ -150,7 +149,7 @@ func (o *XdpEngine) Init() error {
 
 // Shutdown stops the XDP offloading engine
 func (o *XdpEngine) Shutdown() {
-	if !o.SetupDone {
+	if !o.isInitialized {
 		return
 	}
 
@@ -174,7 +173,7 @@ func (o *XdpEngine) Shutdown() {
 		return
 	}
 
-	o.SetupDone = false
+	o.isInitialized = false
 
 	o.log.Info("Shutdown done")
 }

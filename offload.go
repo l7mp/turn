@@ -4,7 +4,6 @@
 package turn
 
 import (
-	"errors"
 	"net"
 
 	"github.com/pion/logging"
@@ -55,14 +54,13 @@ func newEngine(opt OffloadConfig) (offload.OffloadEngine, error) {
 		switch m {
 		case "xdp":
 			// try XDP/eBPF
-			off, err = offload.NewXdpEngine(opt.Interfaces, opt.Log, false)
+			off, err = offload.NewXdpEngine(opt.Interfaces, opt.Log)
 		case "null":
 			// no offload
 			off, err = offload.NewNullEngine(opt.Log)
 		default:
 			opt.Log.Error("unsupported mechanism")
-			//nolint:goerr113
-			off, err = nil, errors.New("unsupported mechanism")
+			off, err = nil, errUnsupportedOffloadMechanism
 		}
 		if off != nil && err == nil {
 			break
