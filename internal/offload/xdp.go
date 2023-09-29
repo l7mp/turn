@@ -234,25 +234,6 @@ func (o *XdpEngine) Remove(client, peer Connection) error {
 	return nil
 }
 
-// GetStat queries statistics about an offloaded connection
-func (o *XdpEngine) GetStat(con Connection) (*Stat, error) {
-	c, err := bpfFourTuple(con)
-	if err != nil {
-		return nil, err
-	}
-	bs := xdp.BpfFourTupleStat{}
-	if err := o.statsMap.Lookup(c, &bs); err != nil {
-		return nil, err
-	}
-
-	s := Stat{}
-	s.Pkts = bs.Pkts
-	s.Bytes = bs.Bytes
-	s.TimeStamp = bs.TimestampLast
-
-	return &s, nil
-}
-
 func hostToNetShort(i uint16) uint16 {
 	b := make([]byte, 2)
 	binary.LittleEndian.PutUint16(b, i)

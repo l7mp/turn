@@ -32,7 +32,6 @@ type OffloadEngine interface {
 	Shutdown()
 	Upsert(client, peer Connection) error
 	Remove(client, peer Connection) error
-	GetStat(con Connection) (*Stat, error)
 }
 
 // Connection combines offload engine identifiers required for uinquely identifying allocation channel bindings. Depending of the used offload engine, some values are not required. For example, the SockFd has no role for an XDP offload
@@ -42,11 +41,4 @@ type Connection struct {
 	Protocol   proto.Protocol
 	SocketFd   uintptr
 	ChannelID  uint32
-}
-
-// Stat holds offload engine-related traffic statistics
-type Stat struct {
-	Pkts      uint64
-	Bytes     uint64
-	TimeStamp uint64
 }

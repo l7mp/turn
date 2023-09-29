@@ -42,9 +42,3 @@ func (o *NullEngine) Remove(client, peer Connection) error {
 	o.log.Debugf("Would remove offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
-
-// GetStat returns null offload statistics
-func (o *NullEngine) GetStat(_ Connection) (*Stat, error) {
-	s := Stat{}
-	return &s, nil
-}
