@@ -123,22 +123,15 @@ func (o *XdpEngine) Init() error {
 	}
 
 	// populate interface IP addresses map
-	ifs, err := net.Interfaces()
+	ifIPMap, err := collectInterfaceIpv4Addrs()
 	if err != nil {
 		return err
 	}
-	for _, netIf := range ifs {
-		ifIdx := netIf.Index
-		addrs, err := netIf.Addrs()
-		if err == nil && len(addrs) > 0 {
-			a, ok := addrs[0].(*net.IPNet)
-			if addr := a.IP.To4(); addr != nil && ok {
-				ifAddr := binary.LittleEndian.Uint32(addr)
-				err := o.ipaddrsMap.Put(uint32(ifIdx), ifAddr)
-				if err != nil {
-					return err
-				}
-			}
+	for idx, addr := range ifIPMap {
+		err := o.ipaddrsMap.Put(uint32(idx),
+			binary.LittleEndian.Uint32(addr))
+		if err != nil {
+			return err
 		}
 	}
 
@@ -181,6 +174,10 @@ func (o *XdpEngine) Shutdown() {
 
 // Upsert creates a new XDP offload between a client and a peer
 func (o *XdpEngine) Upsert(client, peer Connection) error {
+	err := o.validate(client, peer)
+	if err != nil {
+		return err
+	}
 	p, err := bpfFourTuple(peer)
 	if err != nil {
 		return err
@@ -232,6 +229,60 @@ func (o *XdpEngine) Remove(client, peer Connection) error {
 
 	o.log.Infof("Remove offload between client: %+v and peer: %+v", client, peer)
 	return nil
+}
+
+// validate checks the eligibility of an offload between a client and a peer
+func (o *XdpEngine) validate(client, peer Connection) error {
+	// check UDP
+	if (client.Protocol != proto.ProtoUDP) || (peer.Protocol != proto.ProtoUDP) {
+		err := errUnsupportedProtocol
+		o.log.Warn(err.Error())
+		return err
+	}
+	// check this is not a local redirect
+	p, ok := peer.RemoteAddr.(*net.UDPAddr)
+	if !ok {
+		err := errUnsupportedProtocol
+		o.log.Warn(err.Error())
+		return err
+	}
+	localNet := net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(8, 32)}
+	ifAddrs, err := collectInterfaceIpv4Addrs()
+	if err != nil {
+		o.log.Warn(err.Error())
+		return err
+	}
+	for _, ip := range ifAddrs {
+		if (p.IP.Equal(ip)) && (!localNet.Contains(p.IP)) {
+			err := errXDPLocalRedirectProhibited
+			o.log.Warn(err.Error())
+			return err
+		}
+	}
+
+	return nil
+}
+
+// collectInterfaceIpv4Addrs creates a map of interface ids to interface IPv4 addresses
+func collectInterfaceIpv4Addrs() (map[int]net.IP, error) {
+	ifs, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[int]net.IP)
+	for _, netIf := range ifs {
+		addrs, err := netIf.Addrs()
+		if err == nil && len(addrs) > 0 {
+			n, ok := addrs[0].(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if addr := n.IP.To4(); addr != nil {
+				m[netIf.Index] = addr
+			}
+		}
+	}
+	return m, nil
 }
 
 func hostToNetShort(i uint16) uint16 {
