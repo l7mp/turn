@@ -303,29 +303,14 @@ int xdp_prog_func(struct xdp_md *ctx)
 
 		// remove padding
 		__u16 pad_len = (__u16)udp_len - chan_len;
-		switch (pad_len) {
-		case 3:
-			r = bpf_xdp_adjust_tail(ctx, -3);
+		if (pad_len >= 0 && pad_len <= 3) {
+			r = bpf_xdp_adjust_tail(ctx, -pad_len);
 			if (r != 0)
 				goto out;
-			break;
-		case 2:
-			r = bpf_xdp_adjust_tail(ctx, -2);
-			if (r != 0)
-				goto out;
-			break;
-		case 1:
-			r = bpf_xdp_adjust_tail(ctx, -1);
-			if (r != 0)
-				goto out;
-			break;
-		case 0:
-			break;
-		default:
-			// something went wrong?
+			udp_len -= pad_len;
+		} else {
 			goto out;
 		}
-		udp_len -= pad_len;
 	}
 
 	// update fields and send packet
