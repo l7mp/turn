@@ -112,9 +112,10 @@ int xdp_prog_func(struct xdp_md *ctx)
 	int rc;
 	long r;
 	struct FourTuple *out_tuple = NULL;
-	__u32 chan_id;
-	__u32 *udp_payload;
 	__u32 chan_data_hdr;
+	__u32 chan_id;
+	__u16 chan_len;
+	__u32 *udp_payload;
 	enum ChanHdrAction chan_hdr_action;
 	struct FourTupleStat *stat;
 	struct FourTupleStat stat_new;
@@ -159,7 +160,7 @@ int xdp_prog_func(struct xdp_md *ctx)
 	out_tuplec_ds = bpf_map_lookup_elem(&turn_server_downstream_map, &in_tuple);
 	if (!out_tuplec_ds) {
 		// to overcome the situation of TURN server not knowing its local IP address:
-		// try lookup with '0.0.0.0' too
+		// try lookup '0.0.0.0'
 		in_tuple.local_ip = 0;
 		out_tuplec_ds = bpf_map_lookup_elem(&turn_server_downstream_map, &in_tuple);
 		in_tuple.local_ip = iphdr->daddr;
@@ -223,9 +224,21 @@ int xdp_prog_func(struct xdp_md *ctx)
 		if ((__u8 *)udp_payload + 4 > (__u8 *)data_end) {
 			goto out;
 		}
-		udp_payload[0] = bpf_htonl(((__u16)chan_id << 16) | (__u16)(udp_len - 4));
+		chan_len = (__u16)(udp_len - 4);
+		udp_payload[0] = bpf_htonl(((__u16)chan_id << 16) | chan_len);
 		chan_data_hdr = udp_payload[0];
 		chan_hdr_action = HDR_ADD;
+
+		// add padding
+		__u16 padded_len = 4 * ((__u16)udp_len / 4);
+		if (padded_len < udp_len) {
+			padded_len += 4;
+		}
+		__u16 padding = padded_len - (__u16)udp_len;
+		r = bpf_xdp_adjust_tail(ctx, padding);
+		if (r != 0)
+			goto out;
+		udp_len += padding;
 
 		out_tuple = &out_tuplec_ds->four_tuple;
 	} else {
@@ -236,6 +249,7 @@ int xdp_prog_func(struct xdp_md *ctx)
 			goto out;
 		}
 		chan_id = (bpf_ntohl(udp_payload[0]) >> 16) & 0xFFFF;
+		chan_len = bpf_ntohl(udp_payload[0]); // last 16 bits only
 		chan_data_hdr = udp_payload[0];
 		chan_hdr_action = HDR_REMOVE;
 
@@ -245,7 +259,7 @@ int xdp_prog_func(struct xdp_md *ctx)
 		out_tuple = bpf_map_lookup_elem(&turn_server_upstream_map, &in_tuplec_us);
 		if (!out_tuple) {
 			// to overcome the situation of TURN server not knowing its local IP address:
-			// try lookup with '0.0.0.0' too
+			// try lookup '0.0.0.0'
 			in_tuplec_us.four_tuple.local_ip = 0;
 			out_tuple = bpf_map_lookup_elem(&turn_server_upstream_map, &in_tuplec_us);
 		}
@@ -286,6 +300,32 @@ int xdp_prog_func(struct xdp_md *ctx)
 		if (r != 0)
 			goto out;
 		udp_len -= 4;
+
+		// remove padding
+		__u16 pad_len = (__u16)udp_len - chan_len;
+		switch (pad_len) {
+		case 3:
+			r = bpf_xdp_adjust_tail(ctx, -3);
+			if (r != 0)
+				goto out;
+			break;
+		case 2:
+			r = bpf_xdp_adjust_tail(ctx, -2);
+			if (r != 0)
+				goto out;
+			break;
+		case 1:
+			r = bpf_xdp_adjust_tail(ctx, -1);
+			if (r != 0)
+				goto out;
+			break;
+		case 0:
+			break;
+		default:
+			// something went wrong?
+			goto out;
+		}
+		udp_len -= pad_len;
 	}
 
 	// update fields and send packet
@@ -323,8 +363,6 @@ int xdp_prog_func(struct xdp_md *ctx)
 	__u64 csum = 0;
 	ipv4_csum(iphdr, sizeof(*iphdr), &csum);
 	iphdr->check = csum;
-	udphdr->check = update_udp_checksum(udphdr->check, old_saddr, iphdr->saddr);
-	udphdr->check = update_udp_checksum(udphdr->check, old_daddr, iphdr->daddr);
 
 	/* Update UDP ports and checksum*/
 	udphdr->source = out_tuple->local_port;
@@ -332,14 +370,17 @@ int xdp_prog_func(struct xdp_md *ctx)
 	udphdr->check = update_udp_checksum(udphdr->check, in_tuple.local_port, udphdr->source);
 	udphdr->check = update_udp_checksum(udphdr->check, in_tuple.remote_port, udphdr->dest);
 
+	udphdr->check = update_udp_checksum(udphdr->check, old_saddr, iphdr->saddr);
+	udphdr->check = update_udp_checksum(udphdr->check, old_daddr, iphdr->daddr);
+
 	udphdr->check = update_udp_checksum(udphdr->check, old_udp_len, udphdr->len);
 
 	if (chan_hdr_action == HDR_ADD) {
+		udphdr->check = bpf_htons(bpf_ntohs(udphdr->check) + len_diff);
 		udphdr->check = update_udp_checksum(udphdr->check, 0, chan_data_hdr);
-		udphdr->check = bpf_htons(bpf_ntohs(udphdr->check) - 4);
 	} else if (chan_hdr_action == HDR_REMOVE) {
+		udphdr->check = bpf_htons(bpf_ntohs(udphdr->check) - len_diff);
 		udphdr->check = update_udp_checksum(udphdr->check, chan_data_hdr, 0);
-		udphdr->check = bpf_htons(bpf_ntohs(udphdr->check) + 4);
 	}
 
 	/* Redirect */
