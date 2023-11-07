@@ -200,6 +200,13 @@ func (o *XdpEngine) Upsert(client, peer Connection) error {
 		return err
 	}
 
+	// register with Local IP = 0 to support multi NIC setups
+	p.LocalIp = 0
+	if err := o.downstreamMap.Put(p, c); err != nil {
+		o.log.Errorf("Error in upsert (downstream map): %s", err.Error())
+		return err
+	}
+
 	o.log.Infof("Create offload between client: %+v and peer: %+v", client, peer)
 	return nil
 }
@@ -224,6 +231,11 @@ func (o *XdpEngine) Remove(client, peer Connection) error {
 	}
 
 	if err := o.upstreamMap.Delete(c); err != nil {
+		return err
+	}
+
+	p.LocalIp = 0
+	if err := o.downstreamMap.Delete(p); err != nil {
 		return err
 	}
 
