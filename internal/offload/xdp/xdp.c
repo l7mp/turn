@@ -359,12 +359,11 @@ int xdp_prog_func(struct xdp_md *ctx)
 	udphdr->check = update_udp_checksum(udphdr->check, old_daddr, iphdr->daddr);
 
 	udphdr->check = update_udp_checksum(udphdr->check, old_udp_len, udphdr->len);
+	udphdr->check = update_udp_checksum(udphdr->check, old_udp_len, udphdr->len);
 
 	if (chan_hdr_action == HDR_ADD) {
-		udphdr->check = bpf_htons(bpf_ntohs(udphdr->check) + len_diff);
 		udphdr->check = update_udp_checksum(udphdr->check, 0, chan_data_hdr);
 	} else if (chan_hdr_action == HDR_REMOVE) {
-		udphdr->check = bpf_htons(bpf_ntohs(udphdr->check) - len_diff);
 		udphdr->check = update_udp_checksum(udphdr->check, chan_data_hdr, 0);
 	}
 
