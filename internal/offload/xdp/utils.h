@@ -14,7 +14,12 @@
 #define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
 #endif
 
-
+#ifndef likely
+#define likely(x)       __builtin_expect((x),1)
+#endif
+#ifndef unlikely
+#define unlikely(x)     __builtin_expect((x),0)
+#endif
 /* from katran/lib/bpf/csum_helpers.h */
 __attribute__((__always_inline__)) static inline __u16 csum_fold_helper(__u64 csum)
 {

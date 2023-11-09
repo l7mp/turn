@@ -158,7 +158,7 @@ int xdp_prog_func(struct xdp_md *ctx)
 	// downstream?
 	struct FourTupleWithChannelId *out_tuplec_ds;
 	out_tuplec_ds = bpf_map_lookup_elem(&turn_server_downstream_map, &in_tuple);
-	if (!out_tuplec_ds) {
+	if (likely(!out_tuplec_ds)) {
 		// to overcome the situation of TURN server not knowing its local IP address:
 		// try lookup '0.0.0.0'
 		in_tuple.local_ip = 0;
