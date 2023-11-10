@@ -101,24 +101,31 @@ int xdp_prog_func(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
+	int action = XDP_PASS;
+	// fib lookup
+	struct bpf_fib_lookup fib_params = {};
+	// parsing
+	int eth_type, ip_type, udp_payload_len;
 	struct hdr_cursor nh;
 	struct ethhdr *eth;
 	struct iphdr *iphdr;
 	struct udphdr *udphdr;
-	struct bpf_fib_lookup fib_params = {};
-	int action = XDP_PASS;
-	int eth_type, ip_type, udp_len;
-	int old_saddr, old_daddr;
+	__u32 *udp_payload;
+	// store original values of pkt fields
+	__be32 orig_saddr, orig_daddr;
+	__be16 orig_udphdr_len;
+	// return values
 	int rc;
 	long r;
+	// TURN processing
 	struct FourTuple *out_tuple = NULL;
+	struct FourTupleStat *stat;
+	struct FourTupleStat stat_new;
+	enum ChanHdrAction chan_hdr_action;
 	__u32 chan_data_hdr;
 	__u32 chan_id;
 	__u16 chan_len;
-	__u32 *udp_payload;
-	enum ChanHdrAction chan_hdr_action;
-	struct FourTupleStat *stat;
-	struct FourTupleStat stat_new;
+	__u16 padding;
 
 	/* These keep track of the next header type and iterator pointer */
 	nh.pos = data;
@@ -136,18 +143,17 @@ int xdp_prog_func(struct xdp_md *ctx)
 		action = XDP_DROP;
 		goto out;
 	}
-	if (iphdr->ttl <= 1)
-		goto out;
 	if (ip_type != IPPROTO_UDP)
 		goto out;
 
-	udp_len = parse_udphdr(&nh, data_end, &udphdr);
-	if (udp_len < 0) {
+	udp_payload_len = parse_udphdr(&nh, data_end, &udphdr);
+	if (udp_payload_len < 0) {
 		action = XDP_DROP;
 		goto out;
-	} else if (udp_len > MAX_UDP_SIZE) {
+	} else if (udp_payload_len > MAX_UDP_SIZE) {
 		goto out;
 	}
+	orig_udphdr_len = udphdr->len;
 
 	// construct four tuple
 	struct FourTuple in_tuple = {.remote_ip = iphdr->saddr,
@@ -171,11 +177,12 @@ int xdp_prog_func(struct xdp_md *ctx)
 		r = bpf_xdp_adjust_head(ctx, -4);
 		if (r != 0)
 			goto out;
+		udp_payload_len += 4;
 		data_end = (void *)(long)ctx->data_end;
 		data = (void *)(long)ctx->data;
+		// note: data_end - data is the NIC-padded length of the packet
 		udp_payload =
 			data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr);
-		udp_len += 4;
 
 		// shift headers by -4 bytes (this extend UDP payload by 4 bytes)
 		int bytes_left = sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr);
@@ -224,21 +231,21 @@ int xdp_prog_func(struct xdp_md *ctx)
 		if ((__u8 *)udp_payload + 4 > (__u8 *)data_end) {
 			goto out;
 		}
-		chan_len = (__u16)(udp_len - 4);
+		chan_len = (__u16)(udp_payload_len - 4);
 		udp_payload[0] = bpf_htonl(((__u16)chan_id << 16) | chan_len);
 		chan_data_hdr = udp_payload[0];
 		chan_hdr_action = HDR_ADD;
 
 		// add padding
-		__u16 padded_len = 4 * ((__u16)udp_len / 4);
-		if (padded_len < udp_len) {
+		__u16 padded_len = 4 * ((__u16)udp_payload_len / 4);
+		if (padded_len < udp_payload_len) {
 			padded_len += 4;
 		}
-		__u16 padding = padded_len - (__u16)udp_len;
+		padding = padded_len - (__u16)udp_payload_len;
 		r = bpf_xdp_adjust_tail(ctx, padding);
 		if (r != 0)
 			goto out;
-		udp_len += padding;
+		udp_payload_len += padding;
 
 		out_tuple = &out_tuplec_ds->four_tuple;
 	} else {
@@ -299,75 +306,104 @@ int xdp_prog_func(struct xdp_md *ctx)
 		r = bpf_xdp_adjust_head(ctx, 4);
 		if (r != 0)
 			goto out;
-		udp_len -= 4;
+		udp_payload_len -= 4;
 
 		// remove padding
-		__u16 pad_len = (__u16)udp_len - chan_len;
-		if (pad_len >= 0 && pad_len <= 3) {
-			r = bpf_xdp_adjust_tail(ctx, -pad_len);
+		padding = (__u16)udp_payload_len - chan_len;
+		if (padding >= 0 && padding <= 3) {
+			r = bpf_xdp_adjust_tail(ctx, -padding);
 			if (r != 0)
 				goto out;
-			udp_len -= pad_len;
+			udp_payload_len -= padding;
 		} else {
 			goto out;
 		}
 	}
 
-	// update fields and send packet
+	// Update header fields
 
-	/* Reparse headers to please the verifier */
+	// reparse headers to please the verifier
 	data_end = (void *)(long)ctx->data_end;
 	data = (void *)(long)ctx->data;
 	nh.pos = data;
 	eth_type = parse_ethhdr(&nh, data_end, &eth);
-	if (eth_type != bpf_htons(ETH_P_IP))
-		goto out;
-	ip_type = parse_iphdr(&nh, data_end, &iphdr);
-	if (ip_type != IPPROTO_UDP)
-		goto out;
-	int ulen = parse_udphdr(&nh, data_end, &udphdr);
-	if (ulen < 0) {
+	if (eth_type != bpf_htons(ETH_P_IP)) {
 		action = XDP_DROP;
 		goto out;
-	} else if (ulen > MAX_UDP_SIZE + 4) {
+	}
+	ip_type = parse_iphdr(&nh, data_end, &iphdr);
+	if (ip_type != IPPROTO_UDP) {
+		action = XDP_DROP;
 		goto out;
 	}
-	short len_diff = udp_len - ulen;
+	int orig_udp_data_len = parse_udphdr(&nh, data_end, &udphdr);
+	if (orig_udp_data_len < 0) {
+		action = XDP_DROP;
+		goto out;
+	} else if (orig_udp_data_len > MAX_UDP_SIZE) {
+		action = XDP_DROP;
+		goto out;
+	}
+
+	// udp_payload_len contains the padded UDP data,
+	// orig_udp_data_len is the Data length of the incoming UDP packet
+	short len_diff = udp_payload_len - orig_udp_data_len;
 	// update IP len: payload + header size
 	iphdr->tot_len = bpf_htons(bpf_ntohs(iphdr->tot_len) + len_diff);
-	// update UDP len: payload + header size
-	short old_udp_len = udphdr->len;
+	// update UDP len: payload (data and padding) changes + header size
 	udphdr->len = bpf_htons(bpf_ntohs(udphdr->len) + len_diff);
 
-	/* Update IP addresses */
-	old_saddr = iphdr->saddr;
-	old_daddr = iphdr->daddr;
+	// update IP addresses
+	orig_saddr = iphdr->saddr;
+	orig_daddr = iphdr->daddr;
 	iphdr->saddr = out_tuple->local_ip;
 	iphdr->daddr = out_tuple->remote_ip;
 	iphdr->check = 0;
-	__u64 csum = 0;
-	ipv4_csum(iphdr, sizeof(*iphdr), &csum);
-	iphdr->check = csum;
+	__u64 ip_csum = 0;
+	ipv4_csum(iphdr, sizeof(*iphdr), &ip_csum);
+	iphdr->check = ip_csum;
 
-	/* Update UDP ports and checksum*/
+	// update UDP ports and checksum
 	udphdr->source = out_tuple->local_port;
 	udphdr->dest = out_tuple->remote_port;
 	udphdr->check = update_udp_checksum(udphdr->check, in_tuple.local_port, udphdr->source);
 	udphdr->check = update_udp_checksum(udphdr->check, in_tuple.remote_port, udphdr->dest);
 
-	udphdr->check = update_udp_checksum(udphdr->check, old_saddr, iphdr->saddr);
-	udphdr->check = update_udp_checksum(udphdr->check, old_daddr, iphdr->daddr);
+	udphdr->check = update_udp_checksum(udphdr->check, orig_saddr, iphdr->saddr);
+	udphdr->check = update_udp_checksum(udphdr->check, orig_daddr, iphdr->daddr);
 
-	udphdr->check = update_udp_checksum(udphdr->check, old_udp_len, udphdr->len);
-	udphdr->check = update_udp_checksum(udphdr->check, old_udp_len, udphdr->len);
+	/* Note: we have to account two changes:
+	    1 - update of the len field
+	    2 - addition of new \0 blocks (e.g., padding and chan data)
 
-	if (chan_hdr_action == HDR_ADD) {
+	   To demo this phenomenon with Scapy:
+	    pkt1 = IP()/UDP()/Raw("a")
+	    pkt2 = IP()/UDP()/Raw("a\0")
+	    pkt1.show2()
+	    pkt2.show2()
+	    Checksums:
+	     - pkt1: 0xa06f
+	     - pkt2: 0xa06d
+	     diff: 2
+	*/
+	udphdr->check = update_udp_checksum(udphdr->check, orig_udphdr_len, udphdr->len);
+	udphdr->check = update_udp_checksum(udphdr->check, orig_udphdr_len, udphdr->len);
+
+	switch (chan_hdr_action) {
+	case HDR_ADD:
 		udphdr->check = update_udp_checksum(udphdr->check, 0, chan_data_hdr);
-	} else if (chan_hdr_action == HDR_REMOVE) {
+		break;
+	case HDR_REMOVE:
 		udphdr->check = update_udp_checksum(udphdr->check, chan_data_hdr, 0);
+		break;
+	default:
+		// something has really really gone wrong
+		action = XDP_DROP;
+		goto out;
+		break;
 	}
 
-	/* Redirect */
+	// Send packet
 	fib_params.family = AF_INET;
 	fib_params.tos = iphdr->tos;
 	fib_params.l4_protocol = iphdr->protocol;
@@ -382,23 +418,24 @@ int xdp_prog_func(struct xdp_md *ctx)
 	rc = bpf_fib_lookup(ctx, &fib_params, sizeof(fib_params), 0);
 	switch (rc) {
 	case BPF_FIB_LKUP_RET_SUCCESS: /* lookup successful */
-		// set eth addr
+		// set eth addrs
 		memcpy(eth->h_dest, fib_params.dmac, ETH_ALEN);
 		memcpy(eth->h_source, fib_params.smac, ETH_ALEN);
 
-		// update ip src addr
-		old_saddr = iphdr->saddr;
+		// update IP source address with the interface's address
+		orig_saddr = iphdr->saddr;
 		__be32 *new_saddr;
 		new_saddr = bpf_map_lookup_elem(&turn_server_interface_ip_addresses_map,
 						&fib_params.ifindex);
 		if (!new_saddr) {
+			action = XDP_DROP;
 			goto out;
 		}
 		iphdr->saddr = *new_saddr;
 
 		// update ip and udp checksums
-		iphdr->check = update_udp_checksum(iphdr->check, old_saddr, iphdr->saddr);
-		udphdr->check = update_udp_checksum(udphdr->check, old_saddr, iphdr->saddr);
+		iphdr->check = update_udp_checksum(iphdr->check, orig_saddr, iphdr->saddr);
+		udphdr->check = update_udp_checksum(udphdr->check, orig_saddr, iphdr->saddr);
 
 		// redirect packet
 		action = bpf_redirect(fib_params.ifindex, 0);
@@ -418,7 +455,7 @@ int xdp_prog_func(struct xdp_md *ctx)
 		break;
 	}
 
-	/* Account sent packet */
+	// Account sent packet
 	if (((action == XDP_PASS) || (action == XDP_REDIRECT))) {
 		stat = bpf_map_lookup_elem(&turn_server_stats_map, out_tuple);
 		__u64 bytes = data_end - data;
