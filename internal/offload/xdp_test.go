@@ -51,21 +51,26 @@ func TestXDPOffload(t *testing.T) {
 	peerIPAddr, err := net.ResolveIPAddr("ip4", "127.0.0.1")
 	assert.NoError(t, err)
 
-	// UDP header + UDP Data ('payload')
-	udpSent := []byte{0x13, 0x88, 0x0f, 0xa0, 0x00, 0x0f, 0x21,
-		0x76, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64}
-
-	// UDP data consisting of the string 'payload'
-	udpRecv := []byte{0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64}
-
-	// UDP header + ChannelData header + 'payload' + padding
-	chanDataSent := []byte{0x07, 0xd0, 0x0d, 0x96, 0x00, 0x14,
-		0xef, 0x26, 0x40, 0x00, 0x00, 0x07, 0x70, 0x61, 0x79, 0x6c,
-		0x6f, 0x61, 0x64, 0x00}
+	// Channel Data Header (channel number: 0x4000, message length: 7)
+	chanDataHdr := []byte{0x40, 0x00, 0x00, 0x07}
+	// payload is the string 'payload'
+	payload := []byte{0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64}
 
 	// ChannelData header + 'payload' + padding
-	chanDataRecv := []byte{0x40, 0x00, 0x00, 0x07, 0x70, 0x61, 0x79,
-		0x6c, 0x6f, 0x61, 0x64, 0x00}
+	chanDataRecv := append(append(chanDataHdr, payload...), 0x00)
+
+	// a UDP header + ChannelData header + 'payload' + padding
+	chanDataSent := append(
+		[]byte{0x07, 0xd0, 0x0d, 0x96, 0x00, 0x14, 0xef, 0x26},
+		append(append(chanDataHdr, payload...), 0x00)...)
+
+	// UDP Data is 'payload'
+	udpRecv := payload
+
+	// a UDP header + 'payload'
+	udpSent := append(
+		[]byte{0x13, 0x88, 0x0f, 0xa0, 0x00, 0x0f, 0x21, 0x76},
+		payload...)
 
 	// setup client side
 	clientIPConn, err := net.ListenIP("ip4:udp", clientIPAddr)
@@ -120,10 +125,13 @@ func TestXDPOffload(t *testing.T) {
 
 		err = clientConn.SetReadDeadline(time.Now().Add(readTimeoutInterval))
 		assert.NoError(t, err)
-		_, _, err = clientConn.ReadFromUDP(received)
+		n, addr, err := clientConn.ReadFromUDP(received)
 		assert.NoError(t, err, "error in receiving data on client side")
 
 		assert.Equal(t, chanDataRecv, received, "expect match")
+		assert.True(t, proto.IsChannelData(received), "expect channel data")
+		assert.Equal(t, len(chanDataRecv), n, "expect payload length padded to align 4B")
+		assert.Equal(t, turnListenAddr.String(), addr.String(), "expect server listener address")
 	})
 
 	t.Run("pass packet from client to peer", func(t *testing.T) {
@@ -136,9 +144,11 @@ func TestXDPOffload(t *testing.T) {
 
 		err = peerConn.SetReadDeadline(time.Now().Add(readTimeoutInterval))
 		assert.NoError(t, err)
-		_, _, err = peerConn.ReadFromUDP(received)
+		n, addr, err := peerConn.ReadFromUDP(received)
 		assert.NoError(t, err, "error in receiving data on client side")
 
 		assert.Equal(t, udpRecv, received, "expect match")
+		assert.Equal(t, len(payload), n, "expect payload length")
+		assert.Equal(t, turnRelayAddr.String(), addr.String(), "expect server relay address")
 	})
 }
