@@ -181,6 +181,7 @@ int xdp_prog_func(struct xdp_md *ctx)
 		data_end = (void *)(long)ctx->data_end;
 		data = (void *)(long)ctx->data;
 		// note: data_end - data is the NIC-padded length of the packet
+		__u16 pkt_buf_len = data_end - data;
 		udp_payload =
 			data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr);
 
@@ -237,16 +238,32 @@ int xdp_prog_func(struct xdp_md *ctx)
 		chan_hdr_action = HDR_ADD;
 
 		// add padding
+
+		// check if new padding is necessary
+		// e.g., in case of NIC-padded packets we can reuse existing padding
+		int useful_len = hdrs_len + udp_payload_len;
+		int existing_padding = pkt_buf_len - useful_len;
+
 		__u16 padded_len = 4 * ((__u16)udp_payload_len / 4);
 		if (padded_len < udp_payload_len) {
 			padded_len += 4;
 		}
 		padding = padded_len - (__u16)udp_payload_len;
+		udp_payload_len += padding;
+
+		if ((existing_padding > 0) && (padding != 0)) {
+			padding -= existing_padding - ((__u32)existing_padding / padding * padding);
+			if (existing_padding > padding) {
+				padding = 0;
+			}
+		}
+
+		// add padding
 		r = bpf_xdp_adjust_tail(ctx, padding);
 		if (r != 0)
 			goto out;
-		udp_payload_len += padding;
 
+		// set out_tuple for further processing
 		out_tuple = &out_tuplec_ds->four_tuple;
 	} else {
 		// read channel id
