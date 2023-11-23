@@ -114,3 +114,23 @@ Following diagram shows what turn-client does:
 > mappedAddr and the external IP:port (*3) are the same) This process is known as
 > "UDP hole punching" and TURN server exhibits "Address-restricted" behavior. Once it is done,
 > packets coming from (*3) will be received by relayConn.
+
+## turn-proxy
+The `turn-procy` directory contains an example that shows a common use of the Pion TURN proxy.
+
+In the demo, a client sends a plain UDP packet to the TURN proxy, which in turn creates a TURN
+allocation on the specified TURN server and proxies the UDP packet through the TURN allocation back
+to itself ("ping-test"). An external TURN server must be running for the ping test to succeed.
+
+The test takes the following arguments.
+
+* -public-ip : TURN server address
+* -port      : TURN server port (defaults to 3478)
+* -user      : A pair of username and password (e.g. "user=pass")
+* -ping:     : Run ping test
+
+```sh
+$ go run turn-server/simple/main.go -public-ip 127.0.0.1 -users user1=pass &
+$ go run turn-proxy/main.go -host 127.0.0.1 -user user1=pass -ping
+```
+

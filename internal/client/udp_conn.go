@@ -405,6 +405,16 @@ func (c *UDPConn) FindAddrByChannelNumber(chNum uint16) (net.Addr, bool) {
 	return b.addr, true
 }
 
+// FindChannelNumberByAddr returns the channel number associated with
+// a peer address on this UDPConn
+func (c *UDPConn) FindChannelNumberByAddr(addr net.Addr) (uint16, bool) {
+	b, ok := c.bindingMgr.findByAddr(addr)
+	if !ok {
+		return 0, false
+	}
+	return b.number, true
+}
+
 func (c *UDPConn) bind(b *binding) error {
 	setters := []stun.Setter{
 		stun.TransactionID,

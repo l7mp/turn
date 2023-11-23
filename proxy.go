@@ -1,0 +1,389 @@
+// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-License-Identifier: MIT
+
+// Package turn contains the public API for pion/turn, a toolkit for building TURN clients and servers
+package turn
+
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"net"
+	"sync"
+	"time"
+
+	"github.com/pion/dtls/v2"
+	"github.com/pion/logging"
+	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v3/stdnet"
+)
+
+// AuthGen is a callback used to generate TURN credentials.
+type AuthGen func() (string, string, error)
+
+// ProxyConfig configures the Pion TURN proxy.
+type ProxyConfig struct {
+	// Listeners is a list of client listeners.
+	Listeners []net.Listener
+
+	// TURN server URI as of RFC7065.
+	TURNServerURI string
+
+	// Address:port for the peer to access.
+	PeerAddr string
+
+	// AuthGen is a callback used to generate TURN authentication credentials.
+	AuthGen AuthGen
+
+	// InsecureMode controls whether self-signed TLS certificates are accepted from the server.
+	InsecureMode bool
+
+	// LoggerFactory must be set for logging from this proxy.
+	LoggerFactory logging.LoggerFactory
+
+	Net transport.Net
+}
+
+func (c *ProxyConfig) validate() error {
+	if c.Listeners == nil || len(c.Listeners) == 0 {
+		return fmt.Errorf("%w: invalid listener", errInvalidProxyConfig)
+	}
+
+	if _, err := ParseURI(c.TURNServerURI); err != nil {
+		return err
+	}
+
+	if _, err := net.ResolveUDPAddr("udp", c.PeerAddr); err != nil {
+		return fmt.Errorf("%w: invalid peer", errInvalidProxyConfig)
+	}
+
+	if c.AuthGen == nil {
+		return fmt.Errorf("%w: invalid credential generator", errInvalidProxyConfig)
+	}
+
+	return nil
+}
+
+type connection struct {
+	listener net.Conn       // Client connection.
+	client   *Client        // TURN client associated with the connection.
+	conn     net.PacketConn // Connection associated with the TURN client.
+	relay    net.PacketConn // Relayed TURN connection to server.
+}
+
+// Proxy is an instance of the Pion TURN Proxy.
+type Proxy struct {
+	serverURI     URI
+	peerAddr      net.Addr
+	connTrack     map[string]*connection // Conntrack table.
+	lock          *sync.Mutex            // Sync access to the conntrack state.
+	authGen       AuthGen
+	insecure      bool
+	loggerFactory logging.LoggerFactory
+	log           logging.LeveledLogger
+	cancel        context.CancelFunc
+	net           transport.Net
+}
+
+// NewProxy creates and starts a Pion TURN Proxy.
+//
+//nolint:gocognit
+func NewProxy(config ProxyConfig) (*Proxy, error) {
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+
+	loggerFactory := config.LoggerFactory
+	if loggerFactory == nil {
+		loggerFactory = logging.NewDefaultLoggerFactory()
+	}
+
+	if config.Net == nil {
+		n, err := stdnet.NewNet()
+		if err != nil {
+			return nil, err
+		}
+		config.Net = n
+	}
+
+	turn, _ := ParseURI(config.TURNServerURI)             //nolint:errcheck
+	peer, _ := net.ResolveUDPAddr("udp", config.PeerAddr) //nolint:errcheck
+
+	p := &Proxy{
+		serverURI:     turn,
+		peerAddr:      peer,
+		connTrack:     make(map[string]*connection),
+		lock:          new(sync.Mutex),
+		authGen:       config.AuthGen,
+		insecure:      config.InsecureMode,
+		loggerFactory: loggerFactory,
+		log:           loggerFactory.NewLogger("proxy"),
+		net:           config.Net,
+	}
+
+	for _, listener := range config.Listeners {
+		go func(l net.Listener) {
+			p.readListener(l)
+		}(listener)
+	}
+
+	//	if (turn server is udp)
+	ctx, cancel := context.WithCancel(context.Background())
+	p.cancel = cancel
+	go p.offload(ctx)
+
+	return p, nil
+}
+
+// Close stops the TURN Proxy. It cleans up any associated state and closes all connections it is managing.
+func (p *Proxy) Close() {
+	for _, client := range p.connTrack {
+		p.delete(client)
+	}
+	p.cancel()
+}
+
+// ConnCount returns the number of active connections via all listeners.
+func (p *Proxy) ConnCount() int {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return len(p.connTrack)
+}
+
+// readListener accepts new connection from a listener and runs a readLoop for each.
+func (p *Proxy) readListener(l net.Listener) {
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			p.log.Debugf("failed to accept: %s", err)
+			return
+		}
+
+		client, err := p.allocate(conn)
+		if err != nil {
+			p.log.Warnf("relay setup failed for client %s: %s", conn.RemoteAddr().String(), err.Error())
+			if err := conn.Close(); err != nil {
+				p.log.Warnf("error closing client connection: %s", err)
+			}
+			continue
+		}
+
+		p.readLoop(client)
+	}
+}
+
+// newConnection creates a new TURN allocation for the client connection.
+func (p *Proxy) allocate(conn net.Conn) (*connection, error) {
+	clientAddr := conn.RemoteAddr()
+	p.log.Debugf("new connection from client %s:%s", clientAddr.Network(), clientAddr.String())
+
+	client := &connection{listener: conn}
+
+	user, passwd, err := p.authGen()
+	if err != nil {
+		return nil, err
+	}
+
+	// connection for the TURN client
+	server := fmt.Sprintf("%s:%d", p.serverURI.Host, p.serverURI.Port)
+
+	proto := p.serverURI.Transport
+	if p.serverURI.Scheme == "turns" {
+		if proto == "udp" {
+			proto = "dtls"
+		} else {
+			proto = "tls"
+		}
+	}
+
+	var turnConn net.PacketConn
+	switch proto {
+	case "udp":
+		t, errListen := p.net.ListenPacket("udp", "0.0.0.0:0")
+		if errListen != nil {
+			return nil, errListen
+		}
+		turnConn = t
+	case "tcp":
+		c, errListen := net.Dial("tcp", server)
+		if errListen != nil {
+			return nil, errListen
+		}
+		turnConn = NewSTUNConn(c)
+	case "tls":
+		c, errListen := tls.Dial("tcp", server, &tls.Config{
+			MinVersion:         tls.VersionTLS10,
+			InsecureSkipVerify: p.insecure, //nolint:gosec
+		})
+		if errListen != nil {
+			return nil, errListen
+		}
+		turnConn = NewSTUNConn(c)
+	case "dtls":
+		addr, errListen := net.ResolveUDPAddr("udp", server)
+		if errListen != nil {
+			return nil, errListen
+		}
+
+		conn, errListen := dtls.Dial("udp", addr, &dtls.Config{
+			InsecureSkipVerify: p.insecure,
+		})
+		if errListen != nil {
+			return nil, errListen
+		}
+		turnConn = NewSTUNConn(conn)
+	default:
+		return nil, fmt.Errorf("%w: invalid protocol", errProxyConnFail)
+	}
+
+	client.conn = turnConn
+
+	turnClient, err := NewClient(&ClientConfig{
+		STUNServerAddr: server,
+		TURNServerAddr: server,
+		Conn:           turnConn,
+		Username:       user,
+		Password:       passwd,
+		LoggerFactory:  p.loggerFactory,
+		Net:            p.net,
+	})
+	if err != nil {
+		p.delete(client)
+		return nil, err
+	}
+
+	if err = turnClient.Listen(); err != nil {
+		p.delete(client)
+		return nil, err
+	}
+	client.client = turnClient
+
+	p.log.Tracef("creating TURN allocation for %s:%s", clientAddr.Network(), clientAddr.String())
+	relayConn, err := turnClient.Allocate()
+	if err != nil {
+		p.delete(client)
+		return nil, err
+	}
+	client.relay = relayConn
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.connTrack[clientAddr.String()] = client
+
+	p.log.Infof("new client: client=%s, relay-address=%s, peer: %s",
+		clientAddr.String(), client.relay.LocalAddr().String(), p.peerAddr.String())
+
+	return client, nil
+}
+
+// delete removes a client connection. Delete can be used any number of times and it will do the right thing.
+func (p *Proxy) delete(client *connection) {
+	clientAddr := client.listener.RemoteAddr()
+	p.log.Debugf("closing client connection to %s", clientAddr.String())
+
+	if client.listener != nil {
+		if err := client.listener.Close(); err != nil {
+			p.log.Warnf("error closing client connection for %s: %s", clientAddr.String(), err.Error())
+		}
+	}
+
+	if client.relay != nil {
+		if err := client.relay.Close(); err != nil {
+			p.log.Warnf("error closing TURN relay connection for %s: %s", clientAddr.String(), err.Error())
+		}
+	}
+
+	if client.client != nil {
+		client.client.Close()
+	}
+
+	if client.conn != nil {
+		if err := client.conn.Close(); err != nil {
+			p.log.Warnf("error closing client connection: %s", err)
+		}
+	}
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	delete(p.connTrack, clientAddr.String())
+}
+
+// readLoop is the main event loop constaning two goroutines. One goroutine reads the client connection and forwards data to the TURN server, and toher other one does the reverse: reads the TURN client and forwards data to the client.
+func (p *Proxy) readLoop(client *connection) {
+	clientAddr := fmt.Sprintf("%s:%s", client.listener.RemoteAddr().Network(), client.listener.RemoteAddr().String())
+	peerAddr := fmt.Sprintf("udp:%s", p.peerAddr.String())
+
+	// read from server
+	go func() {
+		defer p.delete(client)
+
+		buffer := make([]byte, defaultInboundMTU)
+		for {
+			n, peer, readErr := client.relay.ReadFrom(buffer[0:])
+			if readErr != nil {
+				if !errors.Is(readErr, net.ErrClosed) {
+					p.log.Debugf("cannot read from TURN relay connection for client %s: %s",
+						clientAddr, readErr.Error())
+				}
+				return
+			}
+
+			p.log.Tracef("forwarding packet of %d bytes from peer %s to client %s",
+				n, peer, clientAddr)
+
+			if _, writeErr := client.listener.Write(buffer[0:n]); writeErr != nil {
+				p.log.Debugf("cannot write to client %s: %s", clientAddr, writeErr.Error())
+				return
+			}
+		}
+	}()
+
+	// read from client
+	go func() {
+		defer p.delete(client)
+
+		buffer := make([]byte, defaultInboundMTU)
+		for {
+			n, readErr := client.listener.Read(buffer)
+			if readErr != nil {
+				if !errors.Is(readErr, net.ErrClosed) {
+					p.log.Debugf("cannot read from client %s: %s", clientAddr, readErr.Error())
+				}
+				return
+			}
+
+			p.log.Tracef("forwarding packet of %d bytes from client %s to peer %s",
+				n, clientAddr, peerAddr)
+
+			if _, writeErr := client.relay.WriteTo(buffer[0:n], p.peerAddr); writeErr != nil {
+				p.log.Debugf("cannot write to TURN relay connection for client %s: %s",
+					clientAddr, writeErr.Error())
+				return
+			}
+		}
+	}()
+}
+
+func (p *Proxy) offload(ctx context.Context) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+
+	defer func() {
+		// remove all offloads
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// for all connections in connTrack:
+			//   if no offload:
+			//      create offload
+
+			// for all offloads:
+			//   if not in connTracks:
+			//      remove offload
+		}
+	}
+}

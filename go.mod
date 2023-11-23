@@ -3,6 +3,7 @@ module github.com/pion/turn/v3
 go 1.16
 
 require (
+	github.com/pion/dtls/v2 v2.2.7
 	github.com/pion/logging v0.2.2
 	github.com/pion/randutil v0.1.0
 	github.com/pion/stun/v2 v2.0.0
