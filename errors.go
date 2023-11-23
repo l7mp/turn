@@ -28,4 +28,8 @@ var (
 	errNonSTUNMessage                = errors.New("non-STUN message from STUN server")
 	errFailedToDecodeSTUN            = errors.New("failed to decode STUN message")
 	errUnexpectedSTUNRequestMessage  = errors.New("unexpected STUN request message")
+	errUnsupportedOffloadMechanism   = errors.New("unsupported offload mechanism")
+	errInvalidTurnURI                = errors.New("invalid TURN URI")
+	errInvalidProxyConfig            = errors.New("proxy: invalid configuration")
+	errProxyConnFail                 = errors.New("proxy: cannot setup TURN connection")
 )
