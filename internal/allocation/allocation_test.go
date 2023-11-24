@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:gochecknoglobals
 var testFiveTuple = FiveTuple{
 	SrcAddr: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 2000},
 	DstAddr: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4000},

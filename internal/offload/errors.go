@@ -5,8 +5,10 @@ package offload
 
 import "errors"
 
+//nolint:revive
 var (
-	errUnsupportedProtocol        = errors.New("offload: protocol not supported")
-	errXDPAlreadyInitialized      = errors.New("offload: XDP engine is already initialized")
-	errXDPLocalRedirectProhibited = errors.New("offload: XDP local redirect not allowed")
+	ErrUnsupportedProtocol        = errors.New("offload: protocol not supported")
+	ErrConnectionNotFound         = errors.New("offload: connection not found")
+	ErrXDPAlreadyInitialized      = errors.New("offload: XDP engine is already initialized")
+	ErrXDPLocalRedirectProhibited = errors.New("offload: XDP local redirect not allowed")
 )

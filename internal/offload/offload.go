@@ -7,6 +7,7 @@
 package offload
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/pion/logging"
@@ -32,6 +33,7 @@ type OffloadEngine interface {
 	Shutdown()
 	Upsert(client, peer Connection) error
 	Remove(client, peer Connection) error
+	List() (map[Connection]Connection, error)
 }
 
 // Connection combines offload engine identifiers required for uinquely identifying allocation channel bindings. Depending of the used offload engine, some values are not required. For example, the SockFd has no role for an XDP offload
@@ -41,4 +43,10 @@ type Connection struct {
 	Protocol   proto.Protocol
 	SocketFd   uintptr
 	ChannelID  uint32
+}
+
+func (c *Connection) String() string {
+	return fmt.Sprintf("%s:local:%s-remote:%s-chan:%d",
+		c.RemoteAddr.Network(), c.LocalAddr.String(), c.RemoteAddr.String(),
+		c.ChannelID)
 }

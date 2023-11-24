@@ -9,12 +9,14 @@ import (
 
 // NullEngine is a null offload engine
 type NullEngine struct {
-	log logging.LeveledLogger
+	conntrack map[Connection]Connection
+	log       logging.LeveledLogger
 }
 
 // NewNullEngine creates an uninitialized null offload engine
 func NewNullEngine(log logging.LeveledLogger) (*NullEngine, error) {
-	return &NullEngine{log: log}, nil
+	c := make(map[Connection]Connection)
+	return &NullEngine{conntrack: c, log: log}, nil
 }
 
 // Init initializes the Null engine
@@ -34,11 +36,29 @@ func (o *NullEngine) Shutdown() {
 // Upsert imitates an offload creation between a client and a peer
 func (o *NullEngine) Upsert(client, peer Connection) error {
 	o.log.Debugf("Would create offload between client: %+v and peer: %+v", client, peer)
+	o.conntrack[client] = peer
 	return nil
 }
 
 // Remove imitates offload deletion between a client and a peer
 func (o *NullEngine) Remove(client, peer Connection) error {
 	o.log.Debugf("Would remove offload between client: %+v and peer: %+v", client, peer)
+
+	if _, ok := o.conntrack[client]; !ok {
+		return ErrConnectionNotFound
+	}
+	delete(o.conntrack, client)
+
 	return nil
+}
+
+// List returns the internal conntrack map, which keeps track of all
+// the connections through the proxy
+func (o *NullEngine) List() (map[Connection]Connection, error) {
+	r := make(map[Connection]Connection)
+	for k, v := range o.conntrack {
+		r[k] = v
+	}
+
+	return r, nil
 }

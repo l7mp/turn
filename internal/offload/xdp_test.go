@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
-//go:build offloadxdp
+//go:build offloadxdp && !js
 
 package offload
 
@@ -114,6 +114,28 @@ func TestXDPOffload(t *testing.T) {
 
 	err = xdpEngine.Init()
 	assert.NoError(t, err, "cannot init XDP offload engine")
+
+	t.Run("upsert/remove entries of the eBPF maps", func(t *testing.T) {
+		c, err := xdpEngine.List()
+		assert.NoError(t, err, "cannot list XDP offload maps")
+		assert.Equal(t, 0, len(c), "map should be empty at start")
+
+		xdpEngine.Upsert(client, peer)
+
+		c, err = xdpEngine.List()
+		assert.NoError(t, err, "cannot list XDP offload maps")
+		assert.Equal(t, 3, len(c),
+			"maps should have three elements (1 upstream and 2 downstreams)")
+
+		assert.NoError(t,
+			xdpEngine.Remove(client, peer),
+			"error in removing peer connection")
+
+		assert.Error(t,
+			xdpEngine.Remove(client, peer),
+			"error in removing non-existing peer connection")
+
+	})
 
 	t.Run("pass packet from peer to client", func(t *testing.T) {
 		xdpEngine.Upsert(client, peer)

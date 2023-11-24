@@ -31,7 +31,7 @@ type XdpEngine struct {
 // NewXdpEngine creates an uninitialized XDP offload engine
 func NewXdpEngine(ifs []net.Interface, log logging.LeveledLogger) (*XdpEngine, error) {
 	if xdp.IsInitialized {
-		return nil, errXDPAlreadyInitialized
+		return nil, ErrXDPAlreadyInitialized
 	}
 	e := &XdpEngine{
 		interfaces: ifs,
@@ -73,7 +73,7 @@ func (o *XdpEngine) unpinMaps() error {
 // Based on https://github.com/l7mp/l7mp/blob/master/udp-offload.js#L232
 func (o *XdpEngine) Init() error {
 	if xdp.IsInitialized {
-		return errXDPAlreadyInitialized
+		return ErrXDPAlreadyInitialized
 	}
 	// enable ipv4 forwarding
 	f := "/proc/sys/net/ipv4/conf/all/forwarding"
@@ -243,18 +243,78 @@ func (o *XdpEngine) Remove(client, peer Connection) error {
 	return nil
 }
 
+// List returns all upstream/downstream offloads stored in the corresponding eBPF maps
+func (o *XdpEngine) List() (map[Connection]Connection, error) {
+	var p xdp.BpfFourTuple
+	var c xdp.BpfFourTupleWithChannelId
+
+	r := make(map[Connection]Connection)
+
+	iterD := o.downstreamMap.Iterate()
+	for iterD.Next(&p, &c) {
+		k := Connection{
+			RemoteAddr: &net.UDPAddr{IP: ipv4(p.RemoteIp), Port: int(p.RemotePort)},
+			LocalAddr:  &net.UDPAddr{IP: ipv4(p.LocalIp), Port: int(p.LocalPort)},
+			Protocol:   proto.ProtoUDP,
+		}
+		v := Connection{
+			RemoteAddr: &net.UDPAddr{
+				IP:   ipv4(c.FourTuple.RemoteIp),
+				Port: int(c.FourTuple.RemotePort),
+			},
+			LocalAddr: &net.UDPAddr{
+				IP:   ipv4(c.FourTuple.LocalIp),
+				Port: int(c.FourTuple.LocalPort),
+			},
+			Protocol:  proto.ProtoUDP,
+			ChannelID: c.ChannelId,
+		}
+		r[k] = v
+	}
+	if err := iterD.Err(); err != nil {
+		return nil, err
+	}
+
+	iterU := o.upstreamMap.Iterate()
+	for iterU.Next(&c, &p) {
+		k := Connection{
+			RemoteAddr: &net.UDPAddr{
+				IP:   ipv4(c.FourTuple.RemoteIp),
+				Port: int(c.FourTuple.RemotePort),
+			},
+			LocalAddr: &net.UDPAddr{
+				IP:   ipv4(c.FourTuple.LocalIp),
+				Port: int(c.FourTuple.LocalPort),
+			},
+			Protocol:  proto.ProtoUDP,
+			ChannelID: c.ChannelId,
+		}
+		v := Connection{
+			RemoteAddr: &net.UDPAddr{IP: ipv4(p.RemoteIp), Port: int(p.RemotePort)},
+			LocalAddr:  &net.UDPAddr{IP: ipv4(p.LocalIp), Port: int(p.LocalPort)},
+			Protocol:   proto.ProtoUDP,
+		}
+		r[k] = v
+	}
+	if err := iterU.Err(); err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
+
 // validate checks the eligibility of an offload between a client and a peer
 func (o *XdpEngine) validate(client, peer Connection) error {
 	// check UDP
 	if (client.Protocol != proto.ProtoUDP) || (peer.Protocol != proto.ProtoUDP) {
-		err := errUnsupportedProtocol
+		err := ErrUnsupportedProtocol
 		o.log.Warn(err.Error())
 		return err
 	}
 	// check this is not a local redirect
 	p, ok := peer.RemoteAddr.(*net.UDPAddr)
 	if !ok {
-		err := errUnsupportedProtocol
+		err := ErrUnsupportedProtocol
 		o.log.Warn(err.Error())
 		return err
 	}
@@ -266,7 +326,7 @@ func (o *XdpEngine) validate(client, peer Connection) error {
 	}
 	for _, ip := range ifAddrs {
 		if (p.IP.Equal(ip)) && (!localNet.Contains(p.IP)) {
-			err := errXDPLocalRedirectProhibited
+			err := ErrXDPLocalRedirectProhibited
 			o.log.Warn(err.Error())
 			return err
 		}
@@ -303,15 +363,21 @@ func hostToNetShort(i uint16) uint16 {
 	return binary.BigEndian.Uint16(b)
 }
 
+func ipv4(i uint32) net.IP {
+	ip := make(net.IP, 4)
+	binary.LittleEndian.PutUint32(ip, i)
+	return ip
+}
+
 // bpfFourTuple creates an xdp.BpfFourTuple struct that can be used in the XDP offload maps
 func bpfFourTuple(c Connection) (*xdp.BpfFourTuple, error) {
 	if c.Protocol != proto.ProtoUDP {
-		return nil, errUnsupportedProtocol
+		return nil, ErrUnsupportedProtocol
 	}
 	l, lok := c.LocalAddr.(*net.UDPAddr)
 	r, rok := c.RemoteAddr.(*net.UDPAddr)
 	if !lok || !rok {
-		return nil, errUnsupportedProtocol
+		return nil, ErrUnsupportedProtocol
 	}
 	var localIP uint32
 	if l.IP.To4() != nil {
