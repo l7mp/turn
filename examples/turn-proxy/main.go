@@ -65,6 +65,7 @@ func main() {
 		TURNServerURI: fmt.Sprintf("turn:%s:%d?transport=udp", *host, *port),
 		Listeners:     []net.Listener{listener},
 		PeerAddr:      clientAddr,
+		RelayConnGen:  turn.DefaultRelayConnGen(true),
 		AuthGen:       func() (string, string, error) { return cred[0], cred[1], nil },
 	})
 	if err != nil {

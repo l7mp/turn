@@ -156,6 +156,7 @@ func testProxyTransport(t *testing.T, c testCase) {
 		TURNServerURI: c.uri,
 		Listeners:     []net.Listener{c.listener},
 		PeerAddr:      "127.0.0.1:5001",
+		RelayConnGen:  DefaultRelayConnGen(true),
 		AuthGen:       func() (string, string, error) { return "user1", "pass1", nil },
 		LoggerFactory: c.loggerFactory,
 	})
