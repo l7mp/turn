@@ -116,7 +116,7 @@ Following diagram shows what turn-client does:
 > packets coming from (*3) will be received by relayConn.
 
 ## turn-proxy
-The `turn-procy` directory contains an example that shows a common use of the Pion TURN proxy.
+The `turn-proxy` directory contains an example that shows a common use of the Pion TURN proxy.
 
 In the demo, a client sends a plain UDP packet to the TURN proxy, which in turn creates a TURN
 allocation on the specified TURN server and proxies the UDP packet through the TURN allocation back
@@ -133,4 +133,3 @@ The test takes the following arguments.
 $ go run turn-server/simple/main.go -public-ip 127.0.0.1 -users user1=pass &
 $ go run turn-proxy/main.go -host 127.0.0.1 -user user1=pass -ping
 ```
-

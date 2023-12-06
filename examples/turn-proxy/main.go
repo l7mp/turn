@@ -95,7 +95,7 @@ func doPingTest(client net.PacketConn, proxyUDPAddr net.Addr) error {
 			msg := string(buf[:n])
 			if sentAt, pingerErr := time.Parse(time.RFC3339Nano, msg); pingerErr == nil {
 				rtt := time.Since(sentAt)
-				log.Printf("pkt %d: %d bytes from from %s time=%d ms\n",
+				log.Printf("pkt %d: %d bytes from %s time=%d ms\n",
 					i, n, from.String(), int(rtt.Seconds()*1000))
 			}
 		}
