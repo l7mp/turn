@@ -5,13 +5,11 @@
 package turn
 
 import (
-	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/pion/dtls/v2"
 	"github.com/pion/logging"
@@ -129,7 +127,6 @@ type Proxy struct {
 	authGen       AuthGen
 	loggerFactory logging.LoggerFactory
 	log           logging.LeveledLogger
-	cancel        context.CancelFunc
 	net           transport.Net
 }
 
@@ -175,11 +172,6 @@ func NewProxy(config ProxyConfig) (*Proxy, error) {
 		}(listener)
 	}
 
-	//	if (turn server is udp)
-	ctx, cancel := context.WithCancel(context.Background())
-	p.cancel = cancel
-	go p.offload(ctx)
-
 	return p, nil
 }
 
@@ -188,7 +180,6 @@ func (p *Proxy) Close() {
 	for _, client := range p.connTrack {
 		p.delete(client)
 	}
-	p.cancel()
 }
 
 // ConnCount returns the number of active connections via all listeners.
@@ -374,27 +365,4 @@ func (p *Proxy) readLoop(client *connection) {
 			}
 		}
 	}()
-}
-
-func (p *Proxy) offload(ctx context.Context) {
-	ticker := time.NewTicker(100 * time.Millisecond)
-
-	defer func() {
-		// remove all offloads
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			// for all connections in connTrack:
-			//   if no offload:
-			//      create offload
-
-			// for all offloads:
-			//   if not in connTracks:
-			//      remove offload
-		}
-	}
 }
