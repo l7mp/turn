@@ -17,6 +17,8 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/transport/v3"
 	"github.com/pion/transport/v3/stdnet"
+	"github.com/pion/turn/v3/internal/offload"
+	"github.com/pion/turn/v3/internal/proto"
 )
 
 // AuthGen is a callback used to generate TURN credentials.
@@ -175,20 +177,25 @@ func NewProxy(config ProxyConfig) (*Proxy, error) {
 		}(listener)
 	}
 
-	//	if (turn server is udp)
 	ctx, cancel := context.WithCancel(context.Background())
 	p.cancel = cancel
-	go p.offload(ctx)
+
+	//nolint:goconst
+	if p.serverURI.Transport == "udp" {
+		go p.offload(ctx)
+	}
 
 	return p, nil
 }
 
-// Close stops the TURN Proxy. It cleans up any associated state and closes all connections it is managing.
+// Close stops the TURN Proxy. It cleans up any associated state and
+// closes all connections it is managing.
 func (p *Proxy) Close() {
 	for _, client := range p.connTrack {
 		p.delete(client)
 	}
 	p.cancel()
+	p.clearOffloads()
 }
 
 // ConnCount returns the number of active connections via all listeners.
@@ -209,7 +216,8 @@ func (p *Proxy) readListener(l net.Listener) {
 
 		client, err := p.allocate(conn)
 		if err != nil {
-			p.log.Warnf("relay setup failed for client %s: %s", conn.RemoteAddr().String(), err.Error())
+			p.log.Warnf("relay setup failed for client %s: %s",
+				conn.RemoteAddr().String(), err.Error())
 			if err := conn.Close(); err != nil {
 				p.log.Warnf("error closing client connection: %s", err)
 			}
@@ -301,7 +309,8 @@ func (p *Proxy) delete(client *connection) {
 
 	if client.relay != nil {
 		if err := client.relay.Close(); err != nil {
-			p.log.Warnf("error closing TURN relay connection for %s: %s", clientAddr.String(), err.Error())
+			p.log.Warnf("error closing TURN relay connection for %s: %s",
+				clientAddr.String(), err.Error())
 		}
 	}
 
@@ -344,7 +353,8 @@ func (p *Proxy) readLoop(client *connection) {
 				n, peer, clientAddr)
 
 			if _, writeErr := client.listener.Write(buffer[0:n]); writeErr != nil {
-				p.log.Debugf("cannot write to client %s: %s", clientAddr, writeErr.Error())
+				p.log.Debugf("cannot write to client %s: %s",
+					clientAddr, writeErr.Error())
 				return
 			}
 		}
@@ -359,7 +369,8 @@ func (p *Proxy) readLoop(client *connection) {
 			n, readErr := client.listener.Read(buffer)
 			if readErr != nil {
 				if !errors.Is(readErr, net.ErrClosed) {
-					p.log.Debugf("cannot read from client %s: %s", clientAddr, readErr.Error())
+					p.log.Debugf("cannot read from client %s: %s",
+						clientAddr, readErr.Error())
 				}
 				return
 			}
@@ -376,25 +387,79 @@ func (p *Proxy) readLoop(client *connection) {
 	}()
 }
 
+// clearOffloads removes all offload from the offload engine
+func (p *Proxy) clearOffloads() {
+	connections, err := offload.Engine.List()
+	p.log.Debugf("offloaded connections: %+v", connections)
+	if err != nil {
+		p.log.Errorf("cannot list offloads: %s", err.Error())
+	}
+	for k, v := range connections {
+		err := offload.Engine.Remove(k, v)
+		if err != nil {
+			p.log.Errorf("cannot remove offload %s:%s: %s", k, v, err.Error())
+		}
+	}
+}
+
+// removeObsoleteOffloads removes offloads from the offload engine that are not in use
+func (p *Proxy) removeObsoleteOffloads(offloads map[offload.Connection]offload.Connection) {
+	for k, v := range offloads {
+		if v.RemoteAddr == nil {
+			p.log.Warnf("cannot find connection in conntrack: %s", k)
+			continue
+		}
+		if _, ok := p.connTrack[v.RemoteAddr.String()]; !ok {
+			if err := offload.Engine.Remove(k, v); err != nil {
+				p.log.Errorf("cannot remove offload %s:%s: %s",
+					k, v, err.Error())
+			}
+		}
+	}
+}
+
+// addNewOffloads registers the new offloads to the offload engine
+func (p *Proxy) addNewOffloads(offloads map[offload.Connection]offload.Connection) {
+	for _, v := range p.connTrack {
+		clientLocal := v.client.conn.LocalAddr()
+		chNum, ok := v.client.relayedConn.FindChannelNumberByAddr(p.peerAddr)
+		if !ok {
+			p.log.Errorf("cannot find channel number for the address %s",
+				clientLocal)
+		}
+		kc := offload.Connection{
+			RemoteAddr: v.client.turnServerAddr,
+			LocalAddr:  clientLocal,
+			Protocol:   proto.ProtoUDP, // TODO ceck
+			ChannelID:  uint32(chNum),
+		}
+		if _, ok := offloads[kc]; !ok {
+			vc := offload.Connection{
+				RemoteAddr: p.peerAddr,
+				LocalAddr:  v.listener.LocalAddr(),
+				Protocol:   proto.ProtoUDP,
+			}
+			if err := offload.Engine.Upsert(kc, vc); err != nil {
+				p.log.Errorf("cannot upsert offload %s:%s: %s",
+					kc, vc, err.Error())
+			}
+		}
+	}
+}
+
 func (p *Proxy) offload(ctx context.Context) {
 	ticker := time.NewTicker(100 * time.Millisecond)
-
-	defer func() {
-		// remove all offloads
-	}()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// for all connections in connTrack:
-			//   if no offload:
-			//      create offload
-
-			// for all offloads:
-			//   if not in connTracks:
-			//      remove offload
+			offloads, err := offload.Engine.List()
+			if err != nil {
+				p.log.Errorf("cannot list offloads: %s", err.Error())
+			}
+			p.removeObsoleteOffloads(offloads)
+			p.addNewOffloads(offloads)
 		}
 	}
 }
