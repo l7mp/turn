@@ -9,7 +9,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pion/logging"
@@ -35,6 +38,8 @@ func main() {
 	port := flag.Int("port", 3478, "TURN server port (default: 3478)")
 	user := flag.String("user", "", "A pair of username and password (e.g. \"user=pass\")")
 	ping := flag.Bool("ping", false, "Run ping test")
+	peer := flag.String("peer", "127.0.0.1:50001", "UDP client (peer) addr")
+	listen := flag.String("listen", "127.0.0.1:50000", "UDP listener the TURN proxy will use")
 	xdp := flag.Bool("xdp", false, "Use XDP offload")
 	flag.Parse()
 
@@ -48,20 +53,11 @@ func main() {
 
 	cred := strings.SplitN(*user, "=", 2)
 
-	// UDP client used for testing.
-	clientAddr := "127.0.0.1:50001"
-	conn, err := net.ListenPacket("udp4", clientAddr)
-	if err != nil {
-		log.Panicf("Failed to listen: %s", err)
-	}
-	defer func() {
-		if closeErr := conn.Close(); closeErr != nil {
-			log.Panicf("Failed to close connection: %s", closeErr)
-		}
-	}()
+	// UDP client (peer) used for testing.
+	clientAddr := *peer
 
 	// UDP listener the TURN proxy will use
-	proxyAddr := "127.0.0.1:50000"
+	proxyAddr := *listen
 	proxyUDPAddr, err := net.ResolveUDPAddr("udp", proxyAddr)
 	if err != nil {
 		log.Panicf("Failed to resolve proxy address: %s", err)
@@ -76,13 +72,20 @@ func main() {
 		}
 	}()
 
-	proxy, err := turn.NewProxy(turn.ProxyConfig{
+	log.Printf("listening on %s, peering to %s", proxyAddr, clientAddr)
+
+	// setup proxy
+	proxyConfig := turn.ProxyConfig{
 		TURNServerURI: fmt.Sprintf("turn:%s:%d?transport=udp", *host, *port),
 		Listeners:     []net.Listener{listener},
 		PeerAddr:      clientAddr,
-		RelayConnGen:  localRelayConnGen(true),
+		RelayConnGen:  turn.DefaultRelayConnGen(true),
 		AuthGen:       func() (string, string, error) { return cred[0], cred[1], nil },
-	})
+	}
+	if *ping {
+		proxyConfig.RelayConnGen = localRelayConnGen(true)
+	}
+	proxy, err := turn.NewProxy(proxyConfig)
 	if err != nil {
 		log.Panicf("Failed to create proxy: %s", err)
 	}
@@ -100,11 +103,27 @@ func main() {
 
 	// If you provided `-ping`, perform a ping test against the proxy.
 	if *ping {
+		conn, err := net.ListenPacket("udp4", clientAddr)
+		if err != nil {
+			log.Panicf("Failed to listen: %s", err)
+		}
+		defer func() {
+			if closeErr := conn.Close(); closeErr != nil {
+				log.Panicf("Failed to close connection: %s", closeErr)
+			}
+		}()
+
 		err = doPingTest(conn, proxyUDPAddr)
 		if err != nil {
 			log.Panicf("Failed to ping: %s", err)
 		}
+		log.Println("ping test done")
+		os.Exit(0)
 	}
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
+	<-done
 }
 
 func doPingTest(client net.PacketConn, proxyUDPAddr net.Addr) error {
