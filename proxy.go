@@ -397,7 +397,7 @@ func (p *Proxy) clearOffloads() {
 	for k, v := range connections {
 		err := offload.Engine.Remove(k, v)
 		if err != nil {
-			p.log.Errorf("cannot remove offload %s:%s: %s", k, v, err.Error())
+			p.log.Errorf("cannot remove offload %+v:%+v: %s", k, v, err.Error())
 		}
 	}
 }
@@ -406,13 +406,12 @@ func (p *Proxy) clearOffloads() {
 func (p *Proxy) removeObsoleteOffloads(offloads map[offload.Connection]offload.Connection) {
 	for k, v := range offloads {
 		if v.RemoteAddr == nil {
-			p.log.Warnf("cannot find connection in conntrack: %s", k)
+			p.log.Warnf("cannot find connection in conntrack: %+v", k)
 			continue
 		}
 		if _, ok := p.connTrack[v.RemoteAddr.String()]; !ok {
 			if err := offload.Engine.Remove(k, v); err != nil {
-				p.log.Errorf("cannot remove offload %s:%s: %s",
-					k, v, err.Error())
+				p.log.Errorf("cannot remove offload %+v:%+v: %s", k, v, err.Error())
 			}
 		}
 	}
@@ -424,13 +423,12 @@ func (p *Proxy) addNewOffloads(offloads map[offload.Connection]offload.Connectio
 		clientLocal := v.client.conn.LocalAddr()
 		chNum, ok := v.client.relayedConn.FindChannelNumberByAddr(p.peerAddr)
 		if !ok {
-			p.log.Errorf("cannot find channel number for the address %s",
-				clientLocal)
+			p.log.Errorf("cannot find channel number for the address %s", clientLocal)
 		}
 		kc := offload.Connection{
 			RemoteAddr: v.client.turnServerAddr,
 			LocalAddr:  clientLocal,
-			Protocol:   proto.ProtoUDP, // TODO ceck
+			Protocol:   proto.ProtoUDP, // TODO check
 			ChannelID:  uint32(chNum),
 		}
 		if _, ok := offloads[kc]; !ok {
@@ -440,8 +438,7 @@ func (p *Proxy) addNewOffloads(offloads map[offload.Connection]offload.Connectio
 				Protocol:   proto.ProtoUDP,
 			}
 			if err := offload.Engine.Upsert(kc, vc); err != nil {
-				p.log.Errorf("cannot upsert offload %s:%s: %s",
-					kc, vc, err.Error())
+				p.log.Errorf("cannot upsert offload %+v:%+v: %s", kc, vc, err.Error())
 			}
 		}
 	}
