@@ -118,7 +118,6 @@ func main() {
 			log.Panicf("Failed to ping: %s", err)
 		}
 		log.Println("ping test done")
-		os.Exit(0)
 	}
 
 	done := make(chan os.Signal, 1)
