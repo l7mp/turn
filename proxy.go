@@ -433,7 +433,7 @@ func (p *Proxy) addNewOffloads(offloads map[offload.Connection]offload.Connectio
 		}
 		if _, ok := offloads[kc]; !ok {
 			vc := offload.Connection{
-				RemoteAddr: p.peerAddr,
+				RemoteAddr: v.listener.RemoteAddr(),
 				LocalAddr:  v.listener.LocalAddr(),
 				Protocol:   proto.ProtoUDP,
 			}
