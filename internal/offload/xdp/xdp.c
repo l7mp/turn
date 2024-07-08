@@ -64,7 +64,7 @@ enum ChanHdrAction { HDR_ADD, HDR_REMOVE };
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__uint(max_entries, MAX_MAP_ENTRIES);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
+	/* __uint(pinning, LIBBPF_PIN_BY_NAME); */
 	__type(key, struct FourTuple);
 	__type(value, struct FourTupleWithChannelId);
 } turn_server_downstream_map SEC(".maps");
@@ -73,7 +73,7 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__uint(max_entries, MAX_MAP_ENTRIES);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
+	/* __uint(pinning, LIBBPF_PIN_BY_NAME); */
 	__type(key, struct FourTupleWithChannelId);
 	__type(value, struct FourTuple);
 } turn_server_upstream_map SEC(".maps");
@@ -82,7 +82,7 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__uint(max_entries, MAX_MAP_ENTRIES);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
+	/* __uint(pinning, LIBBPF_PIN_BY_NAME); */
 	__type(key, struct FourTuple);
 	__type(value, struct FourTupleStat);
 } turn_server_stats_map SEC(".maps");
@@ -91,7 +91,7 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__uint(max_entries, MAX_MAP_ENTRIES);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
+	/* __uint(pinning, LIBBPF_PIN_BY_NAME); */
 	__type(key, __u32);
 	__type(value, __be32);
 } turn_server_interface_ip_addresses_map SEC(".maps");
