@@ -15,8 +15,13 @@
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
+// IP flags
+#define IP_CE 0x8000     /* Flag: "Congestion" */
+#define IP_DF 0x4000     /* Flag: "Don't Fragment" */
+#define IP_MF 0x2000     /* Flag: "More Fragments" */
+#define IP_OFFSET 0x1FFF /* "Fragment Offset" part */
+
 #define MAX_MAP_ENTRIES 10240
-#define MAX_UDP_SIZE 1480
 
 struct FourTuple {
 	__u32 remote_ip;
@@ -146,11 +151,14 @@ int xdp_prog_func(struct xdp_md *ctx)
 	if (ip_type != IPPROTO_UDP)
 		goto out;
 
+	// pass IP fragments
+	if ((iphdr->frag_off & bpf_htons(IP_MF)) || (iphdr->frag_off & bpf_htons(IP_OFFSET))) {
+		goto out;
+	}
+
 	udp_payload_len = parse_udphdr(&nh, data_end, &udphdr);
 	if (udp_payload_len < 0) {
 		action = XDP_DROP;
-		goto out;
-	} else if (udp_payload_len > MAX_UDP_SIZE) {
 		goto out;
 	}
 	orig_udphdr_len = udphdr->len;
@@ -357,9 +365,6 @@ int xdp_prog_func(struct xdp_md *ctx)
 	if (orig_udp_data_len < 0) {
 		action = XDP_DROP;
 		goto out;
-	} else if (orig_udp_data_len > MAX_UDP_SIZE) {
-		action = XDP_DROP;
-		goto out;
 	}
 
 	// udp_payload_len contains the padded UDP data,
@@ -460,14 +465,14 @@ int xdp_prog_func(struct xdp_md *ctx)
 
 	case BPF_FIB_LKUP_RET_BLACKHOLE:   /* dest is blackholed; can be dropped */
 	case BPF_FIB_LKUP_RET_UNREACHABLE: /* dest is unreachable; can be dropped */
-	case BPF_FIB_LKUP_RET_PROHIBIT:	   /* dest not allowed; can be dropped */
+	case BPF_FIB_LKUP_RET_PROHIBIT:    /* dest not allowed; can be dropped */
 		action = XDP_DROP;
 		break;
 
 	case BPF_FIB_LKUP_RET_NOT_FWDED:    /* packet is not forwarded */
 	case BPF_FIB_LKUP_RET_FWD_DISABLED: /* fwding is not enabled on ingress */
 	case BPF_FIB_LKUP_RET_UNSUPP_LWT:   /* fwd requires encapsulation */
-	case BPF_FIB_LKUP_RET_NO_NEIGH:	    /* no neighbor entry for nh */
+	case BPF_FIB_LKUP_RET_NO_NEIGH:     /* no neighbor entry for nh */
 	case BPF_FIB_LKUP_RET_FRAG_NEEDED:  /* fragmentation required to fwd */
 		break;
 	}
