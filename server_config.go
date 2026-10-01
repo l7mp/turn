@@ -82,6 +82,11 @@ func (c *PacketConnConfig) validate() error {
 // ListenerConfig is a single net.Listener to accept connections on.
 // This will be used for TCP, TLS and DTLS listeners.
 type ListenerConfig struct {
+	// Listener emits the client conns the server serves, each as it is: a conn must deliver
+	// exactly one STUN or ChannelData message per Read. A datagram conn (UDP, DTLS) does so
+	// already; a stream conn (TCP, TLS) must come framed, see NewSTUNListener. The server never
+	// runs a TLS handshake: the TLS state of a conn whose handshake has completed when it is
+	// accepted reaches the AuthHandler in RequestAttributes.TLS.
 	Listener net.Listener
 
 	// When an allocation is generated the RelayAddressGenerator

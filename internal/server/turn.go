@@ -348,7 +348,9 @@ func handleRefreshRequest(req Request, stunMsg *stun.Message) error {
 	if lifetimeDuration != 0 {
 		a.Refresh(lifetimeDuration)
 	} else {
-		req.AllocationManager.DeleteAllocation(fiveTuple)
+		// Answer before deleting: deleting an allocation made on a connected client conn
+		// closes that conn, and with it the only way to reach the client.
+		defer req.AllocationManager.DeleteAllocation(fiveTuple)
 	}
 
 	return buildAndSend(
@@ -695,7 +697,7 @@ func handleConnectRequest(req Request, stunMsg *stun.Message) error {
 	)...)
 }
 
-func handleConnectionBindRequest(req Request, stunMsg *stun.Message) error {
+func handleConnectionBindRequest(req Request, stunMsg *stun.Message) error { //nolint:cyclop
 	req.Log.Debugf("Received ConnectBind from %s", req.SrcAddr)
 	badRequestMsg := buildMsg(
 		stunMsg.TransactionID,
@@ -722,8 +724,12 @@ func handleConnectionBindRequest(req Request, stunMsg *stun.Message) error {
 		return buildAndSendErr(req.Conn, req.SrcAddr, err, badRequestMsg...)
 	}
 
-	stunConn, ok := req.Conn.(*proto.STUNConn)
-	if !ok {
+	// The data connection is spliced raw: find the stream underneath the STUN framing
+	var stunConn *proto.STUNConn
+	if clientConn, ok := req.Conn.(*proto.ClientConn); ok {
+		stunConn, _ = clientConn.Conn.(*proto.STUNConn)
+	}
+	if stunConn == nil {
 		return buildAndSendErr(req.Conn, req.SrcAddr, err, badRequestMsg...)
 	}
 

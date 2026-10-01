@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
@@ -14,6 +15,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/pion/turn/v5"
 )
@@ -58,6 +60,34 @@ func getClientTLSAuthHandler(verifyOpts x509.VerifyOptions) turn.AuthHandler {
 		log.Printf("Request not allowed: no valid certificates found")
 
 		return "", nil, false
+	}
+}
+
+// handshakeListener completes the TLS handshake of every conn it accepts, so that the server
+// sees the client certificates, and frames the conn for the server. A slow handshake holds up
+// the next Accept: fine for an example, a production listener runs handshakes concurrently.
+type handshakeListener struct {
+	net.Listener
+}
+
+func (l handshakeListener) Accept() (net.Conn, error) {
+	for {
+		conn, err := l.Listener.Accept()
+		if err != nil {
+			return nil, err
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err = conn.(*tls.Conn).HandshakeContext(ctx) //nolint:forcetypeassert
+		cancel()
+		if err != nil {
+			log.Printf("TLS handshake failed: %v", err)
+			_ = conn.Close()
+
+			continue
+		}
+
+		return turn.NewSTUNStreamConn(conn), nil
 	}
 }
 
@@ -134,7 +164,7 @@ func main() {
 		AuthHandler: getClientTLSAuthHandler(x509.VerifyOptions{Roots: caCertPool}),
 		ListenerConfigs: []turn.ListenerConfig{
 			{
-				Listener: tlsListener,
+				Listener: handshakeListener{tlsListener},
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP(*publicIP),
 					Address:      "0.0.0.0",

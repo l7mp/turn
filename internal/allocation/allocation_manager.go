@@ -4,6 +4,7 @@
 package allocation
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -275,6 +276,15 @@ func (m *Manager) DeleteAllocation(fiveTuple *FiveTuple) {
 		m.log.Errorf("Failed to close allocation: %v", err)
 	}
 	m.lock.Unlock()
+
+	// An allocation made on a connected client conn owns that conn: closing it ends the conn's
+	// read loop, whose own cleanup then finds the allocation gone. A shared server PacketConn
+	// is never closed here.
+	if clientConn, ok := allocation.TurnSocket.(*proto.ClientConn); ok {
+		if err := clientConn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			m.log.Debugf("Failed to close client conn of allocation: %v", err)
+		}
+	}
 
 	if m.EventHandler.OnAllocationDeleted != nil {
 		m.EventHandler.OnAllocationDeleted(fiveTuple.SrcAddr, fiveTuple.DstAddr,

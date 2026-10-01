@@ -4,6 +4,7 @@
 package proto
 
 import (
+	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"net"
@@ -115,6 +116,34 @@ func (s *STUNConn) SetReadDeadline(t time.Time) error {
 // SetWriteDeadline implements SetWriteDeadline from net.PacketConn.
 func (s *STUNConn) SetWriteDeadline(t time.Time) error {
 	return s.nextConn.SetWriteDeadline(t)
+}
+
+// Read reads exactly one STUN or ChannelData message, which makes a STUNConn usable as the
+// net.Conn a server accepts from a stream listener.
+func (s *STUNConn) Read(payload []byte) (int, error) {
+	n, _, err := s.ReadFrom(payload)
+
+	return n, err
+}
+
+// Write writes a STUN or ChannelData message to the underlying stream.
+func (s *STUNConn) Write(payload []byte) (int, error) {
+	return s.nextConn.Write(payload)
+}
+
+// RemoteAddr returns the remote address of the underlying stream.
+func (s *STUNConn) RemoteAddr() net.Addr {
+	return s.nextConn.RemoteAddr()
+}
+
+// ConnectionState returns the TLS state of the underlying stream, the zero value if it is not
+// TLS.
+func (s *STUNConn) ConnectionState() tls.ConnectionState {
+	if c, ok := s.nextConn.(interface{ ConnectionState() tls.ConnectionState }); ok {
+		return c.ConnectionState()
+	}
+
+	return tls.ConnectionState{}
 }
 
 // Conn returns the net.Conn used for this STUNConn.
