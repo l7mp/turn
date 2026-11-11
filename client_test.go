@@ -206,7 +206,7 @@ func TestTCPClient(t *testing.T) {
 		},
 		ListenerConfigs: []ListenerConfig{
 			{
-				Listener: tcpListener,
+				Listener: NewSTUNListener(tcpListener),
 				RelayAddressGenerator: &RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP("127.0.0.1"),
 					Address:      "0.0.0.0",
@@ -280,7 +280,7 @@ func TestTCPClientWithoutAddress(t *testing.T) {
 		},
 		ListenerConfigs: []ListenerConfig{
 			{
-				Listener: tcpListener,
+				Listener: NewSTUNListener(tcpListener),
 				RelayAddressGenerator: &RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP("127.0.0.1"),
 					Address:      "0.0.0.0",
@@ -392,7 +392,7 @@ func TestTCPClientDial(t *testing.T) {
 		},
 		ListenerConfigs: []ListenerConfig{
 			{
-				Listener: tcpListener,
+				Listener: NewSTUNListener(tcpListener),
 				RelayAddressGenerator: &RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP("127.0.0.1"),
 					Address:      "0.0.0.0",
@@ -486,7 +486,7 @@ func TestTCPClientAccept(t *testing.T) {
 		},
 		ListenerConfigs: []ListenerConfig{
 			{
-				Listener: tcpListener,
+				Listener: NewSTUNListener(tcpListener),
 				RelayAddressGenerator: &RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP("127.0.0.1"),
 					Address:      "0.0.0.0",
@@ -563,7 +563,7 @@ func TestTCPClientMultipleConns(t *testing.T) {
 		},
 		ListenerConfigs: []ListenerConfig{
 			{
-				Listener: tcpListener,
+				Listener: NewSTUNListener(tcpListener),
 				RelayAddressGenerator: &RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP("127.0.0.1"),
 					Address:      "0.0.0.0",

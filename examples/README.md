@@ -362,6 +362,8 @@ The `mutual-tls-auth` directory contains an end-to-end example of how to use cli
 
 **Authentication Model:** Unlike other examples that use a static list of username/password pairs, this example uses certificate-based authentication. The server trusts any client with a certificate signed by the trusted CA. Normally, the username:password combination is used for message integrity, but this is unnecessary here because TLS itself provides integrity and authentication through the certificate validation.
 
+The server never runs a TLS handshake, so the example's listener completes it before handing a conn to the server: the TLS state, client certificates included, then reaches the AuthHandler.
+
 > In this example, the AuthHandler derives the auth key from the certificate's CommonName (treating it as the username) and an empty string as the password. Note that it doesn't matter which part of the certificate is used to derive the auth key (CommonName, serial number, SANs, etc.), or even if no part of the certificate is used, as long as the client and server agree on the scheme and arrive at the same value.
 
 To run the example:

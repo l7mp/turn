@@ -64,7 +64,7 @@ func main() {
 		// ListenerConfig is a list of Listeners and the configuration around them
 		ListenerConfigs: []turn.ListenerConfig{
 			{
-				Listener: tcpListener,
+				Listener: turn.NewSTUNListener(tcpListener),
 				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
 					RelayAddress: net.ParseIP(*publicIP),
 					Address:      "0.0.0.0",

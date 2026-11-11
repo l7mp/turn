@@ -5,7 +5,6 @@
 package turn
 
 import (
-	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -171,26 +170,17 @@ func (s *Server) readListener(l net.Listener, am *allocation.Manager) {
 		}
 
 		go func() {
-			var tlsConnectionState *tls.ConnectionState
-
-			// Extract tls connection state if possible
-			tlsConn, ok := conn.(*tls.Conn)
-			if ok {
-				// Force TLS handshake to complete before extracting connection state.
-				// Per crypto/tls docs: handshakes are lazy (complete on first I/O).
-				// We must call Handshake() explicitly to populate PeerCertificates.
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-				defer cancel()
-				if err := tlsConn.HandshakeContext(ctx); err != nil {
-					s.log.Errorf("TLS handshake failed: %s", err)
-
-					return
+			// The TLS state of a conn whose handshake has completed reaches the AuthHandler
+			var tlsState *tls.ConnectionState
+			if c, ok := conn.(interface{ ConnectionState() tls.ConnectionState }); ok {
+				if cs := c.ConnectionState(); cs.HandshakeComplete {
+					tlsState = &cs
 				}
-				cs := tlsConn.ConnectionState()
-				tlsConnectionState = &cs
 			}
 
-			s.readLoop(NewSTUNConn(conn), am, tlsConnectionState)
+			// Accepted conns are served as they are: a datagram conn delivers one message per
+			// read already, a stream conn must come framed (see NewSTUNListener)
+			s.readLoop(&proto.ClientConn{Conn: conn}, am, tlsState)
 
 			// Delete allocation
 			am.DeleteAllocation(&allocation.FiveTuple{
